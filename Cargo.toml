@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 num-traits = "0.2.6"
+byteorder = "1.2.7"
 
 [dev-dependencies]
 maplit = "1.0.1"
