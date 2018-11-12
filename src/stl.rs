@@ -6,7 +6,7 @@ use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-pub type Vector3 = (f32, f32, f32);
+use crate::vector3::Vector3;
 
 #[derive(Clone)]
 pub struct Stl {
@@ -34,7 +34,7 @@ impl Stl {
             let y = r.read_f32::<LittleEndian>()?;
             let z = r.read_f32::<LittleEndian>()?;
 
-            Ok((x, y, z))
+            Ok(Vector3::new(x, y, z))
         };
 
         for _ in 0..ntriangles {
@@ -56,6 +56,14 @@ impl Stl {
         }
 
         Ok(Stl { header, facets })
+    }
+
+    pub fn vertices(&self) -> impl Iterator<Item = &Vector3> {
+        self.facets.iter().flat_map(|f| &f.vertices)
+    }
+
+    pub fn vertices_mut(&mut self) -> impl Iterator<Item = &mut Vector3> {
+        self.facets.iter_mut().flat_map(|f| &mut f.vertices)
     }
 }
 
@@ -81,7 +89,7 @@ impl PartialEq for Stl {
 mod tests {
     use std::io;
 
-    use super::{Facet, Stl};
+    use super::{Facet, Stl, Vector3};
 
     #[test]
     fn test_parse_cube() {
@@ -104,52 +112,100 @@ mod tests {
                 ],
                 facets: vec![
                     Facet {
-                        normal: (-1.0, 0.0, 0.0),
-                        vertices: [(-1.0, -1.0, -1.0), (-1.0, -1.0, 1.0), (-1.0, 1.0, 1.0)],
+                        normal: Vector3::new(-1.0, 0.0, 0.0),
+                        vertices: [
+                            Vector3::new(-1.0, -1.0, -1.0),
+                            Vector3::new(-1.0, -1.0, 1.0),
+                            Vector3::new(-1.0, 1.0, 1.0)
+                        ],
                     },
                     Facet {
-                        normal: (-1.0, 0.0, 0.0),
-                        vertices: [(-1.0, 1.0, 1.0), (-1.0, 1.0, -1.0), (-1.0, -1.0, -1.0)],
+                        normal: Vector3::new(-1.0, 0.0, 0.0),
+                        vertices: [
+                            Vector3::new(-1.0, 1.0, 1.0),
+                            Vector3::new(-1.0, 1.0, -1.0),
+                            Vector3::new(-1.0, -1.0, -1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, 1.0, 0.0),
-                        vertices: [(-1.0, 1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)],
+                        normal: Vector3::new(0.0, 1.0, 0.0),
+                        vertices: [
+                            Vector3::new(-1.0, 1.0, -1.0),
+                            Vector3::new(-1.0, 1.0, 1.0),
+                            Vector3::new(1.0, 1.0, 1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, 1.0, 0.0),
-                        vertices: [(1.0, 1.0, 1.0), (1.0, 1.0, -1.0), (-1.0, 1.0, -1.0)],
+                        normal: Vector3::new(0.0, 1.0, 0.0),
+                        vertices: [
+                            Vector3::new(1.0, 1.0, 1.0),
+                            Vector3::new(1.0, 1.0, -1.0),
+                            Vector3::new(-1.0, 1.0, -1.0)
+                        ],
                     },
                     Facet {
-                        normal: (1.0, 0.0, 0.0),
-                        vertices: [(1.0, 1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, 1.0)],
+                        normal: Vector3::new(1.0, 0.0, 0.0),
+                        vertices: [
+                            Vector3::new(1.0, 1.0, -1.0),
+                            Vector3::new(1.0, 1.0, 1.0),
+                            Vector3::new(1.0, -1.0, 1.0)
+                        ],
                     },
                     Facet {
-                        normal: (1.0, 0.0, 0.0),
-                        vertices: [(1.0, -1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, -1.0)],
+                        normal: Vector3::new(1.0, 0.0, 0.0),
+                        vertices: [
+                            Vector3::new(1.0, -1.0, 1.0),
+                            Vector3::new(1.0, -1.0, -1.0),
+                            Vector3::new(1.0, 1.0, -1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, -1.0, 0.0),
-                        vertices: [(-1.0, -1.0, 1.0), (-1.0, -1.0, -1.0), (1.0, -1.0, -1.0)],
+                        normal: Vector3::new(0.0, -1.0, 0.0),
+                        vertices: [
+                            Vector3::new(-1.0, -1.0, 1.0),
+                            Vector3::new(-1.0, -1.0, -1.0),
+                            Vector3::new(1.0, -1.0, -1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, -1.0, 0.0),
-                        vertices: [(1.0, -1.0, -1.0), (1.0, -1.0, 1.0), (-1.0, -1.0, 1.0)],
+                        normal: Vector3::new(0.0, -1.0, 0.0),
+                        vertices: [
+                            Vector3::new(1.0, -1.0, -1.0),
+                            Vector3::new(1.0, -1.0, 1.0),
+                            Vector3::new(-1.0, -1.0, 1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, 0.0, -1.0),
-                        vertices: [(1.0, -1.0, -1.0), (-1.0, -1.0, -1.0), (-1.0, 1.0, -1.0)],
+                        normal: Vector3::new(0.0, 0.0, -1.0),
+                        vertices: [
+                            Vector3::new(1.0, -1.0, -1.0),
+                            Vector3::new(-1.0, -1.0, -1.0),
+                            Vector3::new(-1.0, 1.0, -1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, 0.0, -1.0),
-                        vertices: [(-1.0, 1.0, -1.0), (1.0, 1.0, -1.0), (1.0, -1.0, -1.0)],
+                        normal: Vector3::new(0.0, 0.0, -1.0),
+                        vertices: [
+                            Vector3::new(-1.0, 1.0, -1.0),
+                            Vector3::new(1.0, 1.0, -1.0),
+                            Vector3::new(1.0, -1.0, -1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, 0.0, 1.0),
-                        vertices: [(1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, -1.0, 1.0)],
+                        normal: Vector3::new(0.0, 0.0, 1.0),
+                        vertices: [
+                            Vector3::new(1.0, 1.0, 1.0),
+                            Vector3::new(-1.0, 1.0, 1.0),
+                            Vector3::new(-1.0, -1.0, 1.0)
+                        ],
                     },
                     Facet {
-                        normal: (0.0, 0.0, 1.0),
-                        vertices: [(-1.0, -1.0, 1.0), (1.0, -1.0, 1.0), (1.0, 1.0, 1.0)],
+                        normal: Vector3::new(0.0, 0.0, 1.0),
+                        vertices: [
+                            Vector3::new(-1.0, -1.0, 1.0),
+                            Vector3::new(1.0, -1.0, 1.0),
+                            Vector3::new(1.0, 1.0, 1.0)
+                        ],
                     },
                 ]
             }
