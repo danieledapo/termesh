@@ -10,7 +10,7 @@
 //! 4x2 cells.
 //!
 
-mod line;
+pub mod line;
 
 use std::collections::BTreeMap;
 
@@ -24,17 +24,30 @@ static BRAILLE_OFFSET_MAP: [[u8; 2]; 4] = [
     [0x40, 0x80], // "⡀" , "⢀"
 ];
 
-fn canvas_pos(x: usize, y: usize) -> (usize, usize) {
-    (x / 2, y / 4)
+fn canvas_pos(x: f32, y: f32) -> (i32, i32) {
+    (
+        (x.round() / 2.0).floor() as i32,
+        (y.round() / 4.0).floor() as i32,
+    )
 }
 
-fn braille_offset_at(x: usize, y: usize) -> u8 {
-    BRAILLE_OFFSET_MAP[y % 4][x % 2]
+fn braille_offset_at(x: f32, y: f32) -> u8 {
+    let mut xoff = x.round() % 2.0;
+    if xoff < 0.0 {
+        xoff += 2.0;
+    }
+
+    let mut yoff = y.round() % 4.0;
+    if yoff < 0.0 {
+        yoff += 4.0;
+    }
+
+    BRAILLE_OFFSET_MAP[yoff as usize][xoff as usize]
 }
 
 #[derive(Debug)]
 pub struct Canvas {
-    rows: BTreeMap<usize, BTreeMap<usize, u8>>,
+    rows: BTreeMap<i32, BTreeMap<i32, u8>>,
 }
 
 impl Canvas {
@@ -48,19 +61,25 @@ impl Canvas {
         self.rows.clear();
     }
 
-    pub fn line(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) {
-        for (x, y) in line::Line::new(x1, y1, x2, y2) {
+    pub fn triangle(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) {
+        self.line(x1, y1, x2, y2);
+        self.line(x1, y1, x3, y3);
+        self.line(x2, y2, x3, y3);
+    }
+
+    pub fn line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32) {
+        for (x, y) in line::Line::new(x1.round(), y1.round(), x2.round(), y2.round()) {
             self.set(x, y);
         }
     }
 
-    pub fn set(&mut self, x: usize, y: usize) {
+    pub fn set(&mut self, x: f32, y: f32) {
         let (c, r) = canvas_pos(x, y);
 
         *self.rows.entry(r).or_default().entry(c).or_default() |= braille_offset_at(x, y);
     }
 
-    pub fn unset(&mut self, x: usize, y: usize) {
+    pub fn unset(&mut self, x: f32, y: f32) {
         use std::collections::btree_map::Entry;
 
         let (c, r) = canvas_pos(x, y);
@@ -80,7 +99,7 @@ impl Canvas {
         }
     }
 
-    pub fn is_set(&self, x: usize, y: usize) -> bool {
+    pub fn is_set(&self, x: f32, y: f32) -> bool {
         let dot_index = braille_offset_at(x, y);
         let (x, y) = canvas_pos(x, y);
 
@@ -98,15 +117,15 @@ impl Canvas {
 #[derive(Debug)]
 pub struct Rows<'a> {
     canvas: &'a Canvas,
-    min_row: usize,
-    max_row: usize,
-    min_col: usize,
+    min_row: i32,
+    max_row: i32,
+    min_col: i32,
 }
 
 impl<'a> Rows<'a> {
     fn new(canvas: &'a Canvas) -> Self {
         let (min_row, max_row, min_col) = match btree_minmax(&canvas.rows) {
-            None => (usize::max_value(), 0, 0),
+            None => (i32::max_value(), 0, 0),
             Some((&min_row, &max_row)) => {
                 let min_c = canvas
                     .rows
@@ -174,7 +193,7 @@ mod tests {
     fn test_set() {
         let mut c = Canvas::new();
 
-        c.set(0, 0);
+        c.set(0.0, 0.0);
 
         assert_eq!(
             c.rows,
@@ -188,8 +207,8 @@ mod tests {
     fn test_unset_empty() {
         let mut c = Canvas::new();
 
-        c.set(1, 1);
-        c.unset(1, 1);
+        c.set(1.0, 1.0);
+        c.unset(1.0, 1.0);
 
         assert_eq!(c.rows, btreemap!{});
     }
@@ -198,9 +217,9 @@ mod tests {
     fn test_unset_non_empty() {
         let mut c = Canvas::new();
 
-        c.set(0, 0);
-        c.set(1, 1);
-        c.unset(1, 1);
+        c.set(0.0, 0.0);
+        c.set(1.0, 1.0);
+        c.unset(1.0, 1.0);
 
         assert_eq!(c.rows, btreemap!{ 0 => btreemap!{ 0 => 1 }});
     }
@@ -209,7 +228,7 @@ mod tests {
     fn test_clear() {
         let mut c = Canvas::new();
 
-        c.set(1, 1);
+        c.set(1.0, 1.0);
         c.clear();
 
         assert_eq!(c.rows, btreemap!{});
@@ -219,13 +238,13 @@ mod tests {
     fn test_get() {
         let mut c = Canvas::new();
 
-        assert!(!c.is_set(0, 0));
+        assert!(!c.is_set(0.0, 0.0));
 
-        c.set(0, 0);
-        assert!(c.is_set(0, 0));
-        assert!(!c.is_set(0, 1));
-        assert!(!c.is_set(1, 0));
-        assert!(!c.is_set(1, 1));
+        c.set(0.0, 0.0);
+        assert!(c.is_set(0.0, 0.0));
+        assert!(!c.is_set(0.0, 1.0));
+        assert!(!c.is_set(1.0, 0.0));
+        assert!(!c.is_set(1.0, 1.0));
     }
 
     #[test]
@@ -233,7 +252,7 @@ mod tests {
         let mut c = Canvas::new();
         assert_eq!(c.rows().collect::<Vec<_>>(), Vec::<String>::new());
 
-        c.set(0, 0);
+        c.set(0.0, 0.0);
         assert_eq!(c.rows().collect::<Vec<_>>(), vec!["⠁".to_string()]);
     }
 
@@ -241,12 +260,12 @@ mod tests {
     fn test_rect() {
         let mut c = Canvas::new();
 
-        c.line(0, 0, 20, 0);
-        c.line(20, 0, 20, 20);
-        c.line(0, 20, 20, 20);
-        c.line(0, 0, 0, 20);
-        c.line(0, 0, 20, 20);
-        c.line(20, 0, 0, 20);
+        c.line(0.0, 0.0, 20.0, 0.0);
+        c.line(20.0, 0.0, 20.0, 20.0);
+        c.line(0.0, 20.0, 20.0, 20.0);
+        c.line(0.0, 0.0, 0.0, 20.0);
+        c.line(0.0, 0.0, 20.0, 20.0);
+        c.line(20.0, 0.0, 0.0, 20.0);
 
         assert_eq!(
             c.rows().collect::<Vec<_>>(),
@@ -267,8 +286,8 @@ mod tests {
 
         for x in (0_u16..3600).step_by(20) {
             s.set(
-                usize::from(x / 20),
-                (4.0 + f64::from(x).to_radians().sin() * 4.0).round() as usize,
+                f32::from(x) / 20.0,
+                (4.0 + f32::from(x).to_radians().sin() * 4.0).round(),
             );
         }
 

@@ -10,14 +10,14 @@ pub type Vector3 = (f32, f32, f32);
 
 #[derive(Clone)]
 pub struct Stl {
-    header: [u8; 80],
-    facets: Vec<Facet>,
+    pub header: [u8; 80],
+    pub facets: Vec<Facet>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Facet {
-    vertices: [Vector3; 3],
-    normal: Vector3,
+    pub vertices: [Vector3; 3],
+    pub normal: Vector3,
 }
 
 impl Stl {
