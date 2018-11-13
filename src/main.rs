@@ -14,24 +14,22 @@ use termesh::stl::Stl;
 fn main() -> io::Result<()> {
     let stl_filepath = env::args().skip(1).next().unwrap();
     let mut f = File::open(stl_filepath)?;
-    let mut stl = Stl::parse_binary(&mut f)?;
-
-    let mut stdout = io::stdout().into_raw_mode()?;
-    write!(
-        stdout,
-        "{}{}\r\n",
-        termion::cursor::Save,
-        termion::cursor::Hide
-    )?;
+    let stl = Stl::parse_binary(&mut f)?;
 
     let mut canvas = Canvas::new();
 
-    // TODO: automatically scale on startup according to terminal size
-    for v in stl.vertices_mut() {
-        v.scale(40.0);
-    }
+    let mut stdout = io::stdout().into_raw_mode()?;
+    write!(stdout, "{}\r\n", termion::cursor::Hide)?;
 
-    update_canvas(&mut stdout, &stl, &mut canvas)?;
+    let terminal_size = termion::terminal_size()?;
+    let scale = determine_scale_factor(&stl, terminal_size.0 - 5, terminal_size.1 - 5);
+
+    // do not change original mesh, because it messes up with scaling
+    let mut initial = stl.clone();
+    for v in initial.vertices_mut() {
+        v.scale(scale);
+    }
+    update_canvas(&mut stdout, &initial, &mut canvas)?;
 
     let angle_inc = PI / 4.0;
 
@@ -56,7 +54,11 @@ fn main() -> io::Result<()> {
 
         let mut stl = stl.clone();
 
+        let terminal_size = termion::terminal_size()?;
+        let scale = determine_scale_factor(&stl, terminal_size.0 - 5, terminal_size.1 - 5);
+
         for v in stl.vertices_mut() {
+            v.scale(scale);
             v.rotate_x(angles[0]);
             v.rotate_y(angles[1]);
             v.rotate_z(angles[2]);
@@ -104,4 +106,29 @@ fn update_canvas<W: Write>(w: &mut W, stl: &Stl, canvas: &mut Canvas) -> io::Res
     canvas.clear();
 
     Ok(())
+}
+
+fn determine_scale_factor(stl: &Stl, max_width: u16, max_height: u16) -> f32 {
+    let mut vs = stl.vertices();
+
+    let (w, h) = vs
+        .next()
+        .map(|v| {
+            vs.fold((v.x, v.y, v.x, v.y), |(min_x, min_y, max_x, max_y), v| {
+                (
+                    min_x.min(v.x),
+                    min_y.min(v.y),
+                    max_x.max(v.x),
+                    max_y.max(v.y),
+                )
+            })
+        })
+        .map_or((1.0, 1.0), |(min_x, min_y, max_x, max_y)| {
+            (max_x - min_x, max_y - min_y)
+        });
+
+    let scalex = f32::from(max_width) / w * 2.0;
+    let scaley = f32::from(max_height) / h * 4.0;
+
+    scalex.min(scaley)
 }
