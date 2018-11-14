@@ -68,14 +68,17 @@ fn main() -> io::Result<()> {
             if termion::is_tty(&io::stdout()) {
                 interactive(stl)
             } else {
-                non_interactive(DumpConfig {
-                    scale: 1.0,
-                    rotation_x: 0.0,
-                    rotation_y: 0.0,
-                    rotation_z: 0.0,
-                }, stl)
+                non_interactive(
+                    DumpConfig {
+                        scale: 1.0,
+                        rotation_x: 0.0,
+                        rotation_y: 0.0,
+                        rotation_z: 0.0,
+                    },
+                    stl,
+                )
             }
-        },
+        }
         Command::Dump(config) => non_interactive(config, stl),
     }
 }
@@ -84,7 +87,12 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
 
-    rotate_stl(&mut stl, config.rotation_x, config.rotation_y, config.rotation_z);
+    rotate_stl(
+        &mut stl,
+        config.rotation_x,
+        config.rotation_y,
+        config.rotation_z,
+    );
     scale_stl(&mut stl, config.scale);
 
     render_stl(&mut stdout, &stl, false)?;
