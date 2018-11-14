@@ -54,14 +54,18 @@ fn main() -> io::Result<()> {
 
         let mut stl = stl.clone();
 
+        for v in stl.vertices_mut() {
+            // v.scale(scale);
+            v.rotate_x(angles[0]);
+            v.rotate_y(angles[1]);
+            v.rotate_z(angles[2]);
+        }
+
         let terminal_size = termion::terminal_size()?;
         let scale = determine_scale_factor(&stl, terminal_size.0 - 5, terminal_size.1 - 5);
 
         for v in stl.vertices_mut() {
             v.scale(scale);
-            v.rotate_x(angles[0]);
-            v.rotate_y(angles[1]);
-            v.rotate_z(angles[2]);
         }
 
         update_canvas(&mut stdout, &stl, &mut canvas)?;
