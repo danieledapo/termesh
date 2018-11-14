@@ -8,6 +8,7 @@ edition = "2018"
 num-traits = "0.2.6"
 byteorder = "1.2.7"
 termion = "1.5.1"
+structopt = "0.2.13"
 
 [dev-dependencies]
 maplit = "1.0.1"
