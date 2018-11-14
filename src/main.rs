@@ -87,7 +87,7 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
     rotate_stl(&mut stl, config.rotation_x, config.rotation_y, config.rotation_z);
     scale_stl(&mut stl, config.scale);
 
-    render_stl(&mut stdout, &stl)?;
+    render_stl(&mut stdout, &stl, false)?;
 
     Ok(())
 }
@@ -104,9 +104,7 @@ fn interactive(stl: Stl) -> io::Result<()> {
             determine_scale_factor(&stl, terminal_size.0 - padding, terminal_size.1 - padding);
 
         scale_stl(&mut stl, scale);
-
-        clear_screen(&mut stdout)?;
-        render_stl(&mut stdout, &stl)?;
+        render_stl(&mut stdout, &stl, true)?;
 
         Ok(())
     };
@@ -182,7 +180,7 @@ fn scale_stl(stl: &mut Stl, scale: f32) {
     }
 }
 
-fn render_stl<W: Write>(w: &mut W, stl: &Stl) -> io::Result<()> {
+fn render_stl<W: Write>(w: &mut W, stl: &Stl, clear: bool) -> io::Result<()> {
     let mut canvas = Canvas::new();
 
     for f in &stl.facets {
@@ -194,6 +192,13 @@ fn render_stl<W: Write>(w: &mut W, stl: &Stl) -> io::Result<()> {
             f.vertices[2].x,
             f.vertices[2].y,
         );
+    }
+
+    // callers can clear the screen by themselves, but it usually causes
+    // flickering on big terminals therefore defer clearing the screen until the
+    // very last.
+    if clear {
+        clear_screen(w)?;
     }
 
     for r in canvas.rows() {
