@@ -18,12 +18,12 @@ fn test_teapot() {
         let c = &facet.vertices[2];
 
         canvas.triangle(
-            a.0 * scale,
-            a.1 * scale,
-            b.0 * scale,
-            b.1 * scale,
-            c.0 * scale,
-            c.1 * scale,
+            a.x * scale,
+            a.y * scale,
+            b.x * scale,
+            b.y * scale,
+            c.x * scale,
+            c.y * scale,
         );
     }
 
