@@ -28,11 +28,23 @@ struct App {
 enum Command {
     /// Interactively render an input mesh in the terminal.
     #[structopt(name = "render")]
-    Render,
+    Render(RenderConfig),
 
     /// Dump an input mesh in the terminal.
     #[structopt(name = "dump")]
     Dump(DumpConfig),
+}
+
+#[derive(Debug, StructOpt)]
+struct RenderConfig {
+    /// Do not render using true colors. This will effectively make the depth
+    /// all the same.
+    #[structopt(long = "no-colors")]
+    no_colors: bool,
+
+    /// Fill triangles.
+    #[structopt(short = "f", long = "fill")]
+    fill: bool,
 }
 
 #[derive(Debug, StructOpt)]
@@ -63,10 +75,15 @@ fn main() -> io::Result<()> {
     let mut f = File::open(app.mesh_filepath)?;
     let stl = Stl::parse_binary(&mut f)?;
 
-    match app.command.unwrap_or(Command::Render) {
-        Command::Render => {
+    let default_command = Command::Render(RenderConfig {
+        no_colors: false,
+        fill: false,
+    });
+
+    match app.command.unwrap_or(default_command) {
+        Command::Render(config) => {
             if termion::is_tty(&io::stdout()) {
-                interactive(stl)
+                interactive(config, stl)
             } else {
                 non_interactive(
                     DumpConfig {
@@ -95,12 +112,20 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
     );
     scale_stl(&mut stl, config.scale);
 
-    render_stl(&mut stdout, &stl, false)?;
+    render_stl(
+        &mut stdout,
+        &stl,
+        false,
+        &RenderConfig {
+            no_colors: true,
+            fill: false,
+        },
+    )?;
 
     Ok(())
 }
 
-fn interactive(stl: Stl) -> io::Result<()> {
+fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
     let mut stdout = io::stdout().into_raw_mode()?;
     write!(stdout, "{}\r\n", termion::cursor::Hide)?;
 
@@ -112,7 +137,7 @@ fn interactive(stl: Stl) -> io::Result<()> {
             determine_scale_factor(&stl, terminal_size.0 - padding, terminal_size.1 - padding);
 
         scale_stl(&mut stl, scale);
-        render_stl(&mut stdout, &stl, true)?;
+        render_stl(&mut stdout, &stl, true, &config)?;
 
         Ok(())
     };
@@ -188,11 +213,22 @@ fn scale_stl(stl: &mut Stl, scale: f32) {
     }
 }
 
-fn render_stl<W: Write>(w: &mut W, stl: &Stl, clear: bool) -> io::Result<()> {
+fn render_stl<W: Write>(
+    w: &mut W,
+    stl: &Stl,
+    clear: bool,
+    render_config: &RenderConfig,
+) -> io::Result<()> {
     let mut canvas = Canvas::new();
 
-    for f in &stl.facets {
-        canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+    if render_config.fill {
+        for f in &stl.facets {
+            canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+        }
+    } else {
+        for f in &stl.facets {
+            canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+        }
     }
 
     // callers can clear the screen by themselves, but it usually causes
@@ -202,7 +238,7 @@ fn render_stl<W: Write>(w: &mut W, stl: &Stl, clear: bool) -> io::Result<()> {
         clear_screen(w)?;
     }
 
-    for r in canvas.rows() {
+    for r in canvas.rows(!render_config.no_colors) {
         write!(w, "{}\r\n", r)?;
     }
     w.flush()?;

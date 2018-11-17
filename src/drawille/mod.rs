@@ -48,13 +48,25 @@ fn braille_offset_at(x: f32, y: f32) -> u8 {
 
 #[derive(Debug)]
 pub struct Canvas {
-    rows: BTreeMap<i32, BTreeMap<i32, u8>>,
+    rows: BTreeMap<i32, BTreeMap<i32, Pixel>>,
+    zrange: Option<(f32, f32)>,
+}
+
+#[derive(Debug, PartialEq)]
+struct Pixel {
+    // offset to sum to `BRAILLE_PATTERN_BLANK` to obtain the braille character
+    // for a pixel
+    braille_offset: u8,
+
+    // z of the pixel, the smaller the closer to the camera it is
+    z: f32,
 }
 
 impl Canvas {
     pub fn new() -> Self {
         Canvas {
             rows: BTreeMap::new(),
+            zrange: None,
         }
     }
 
@@ -68,6 +80,29 @@ impl Canvas {
         self.line(p1, p2);
     }
 
+    pub fn fill_triangle(&mut self, mut p0: Vector3, mut p1: Vector3, mut p2: Vector3) {
+        // TODO: doesn't seem to completely fill triangles...
+
+        // ensure p0 is the point with highest y, then comes p1 and then p2
+        if p1.y < p0.y {
+            std::mem::swap(&mut p0, &mut p1);
+        }
+        if p2.y < p0.y {
+            std::mem::swap(&mut p0, &mut p2);
+        }
+        if p2.y < p1.y {
+            std::mem::swap(&mut p1, &mut p2);
+        }
+
+        for (line_start, line_end) in line::Line::new(p0, p1).zip(line::Line::new(p0, p2)) {
+            self.line(line_start, line_end);
+        }
+
+        for (line_start, line_end) in line::Line::new(p2, p0).zip(line::Line::new(p2, p1)) {
+            self.line(line_start, line_end);
+        }
+    }
+
     pub fn line(&mut self, p0: Vector3, p1: Vector3) {
         for p in line::Line::new(p0.round(), p1.round()) {
             self.set(p);
@@ -75,9 +110,31 @@ impl Canvas {
     }
 
     pub fn set(&mut self, p: Vector3) {
+        use std::collections::btree_map::Entry;
+
         let (c, r) = canvas_pos(p.x, p.y);
 
-        *self.rows.entry(r).or_default().entry(c).or_default() |= braille_offset_at(p.x, p.y);
+        self.zrange = match self.zrange {
+            None => Some((p.z, p.z)),
+            Some((minz, maxz)) => Some((minz.min(p.z), maxz.max(p.z))),
+        };
+
+        let braille_offset = braille_offset_at(p.x, p.y);
+
+        match self.rows.entry(r).or_default().entry(c) {
+            Entry::Vacant(v) => {
+                v.insert(Pixel {
+                    braille_offset,
+                    z: p.z,
+                });
+            }
+            Entry::Occupied(mut o) => {
+                let pix = o.get_mut();
+
+                pix.braille_offset |= braille_offset;
+                pix.z = pix.z.min(p.z);
+            }
+        };
     }
 
     pub fn is_set(&self, x: f32, y: f32) -> bool {
@@ -87,24 +144,25 @@ impl Canvas {
         self.rows
             .get(&y)
             .and_then(|row| row.get(&x))
-            .map_or(false, |c| c & dot_index != 0)
+            .map_or(false, |c| c.braille_offset & dot_index != 0)
     }
 
-    pub fn rows(&self) -> Rows {
-        Rows::new(self)
+    pub fn rows(&self, with_colors: bool) -> Rows {
+        Rows::new(self, with_colors)
     }
 }
 
 #[derive(Debug)]
 pub struct Rows<'a> {
     canvas: &'a Canvas,
+    with_colors: bool,
     min_row: i32,
     max_row: i32,
     min_col: i32,
 }
 
 impl<'a> Rows<'a> {
-    fn new(canvas: &'a Canvas) -> Self {
+    fn new(canvas: &'a Canvas, with_colors: bool) -> Self {
         let (min_row, max_row, min_col) = match btree_minmax(&canvas.rows) {
             None => (i32::max_value(), 0, 0),
             Some((&min_row, &max_row)) => {
@@ -126,6 +184,7 @@ impl<'a> Rows<'a> {
             min_row,
             max_row,
             min_col,
+            with_colors,
         }
     }
 }
@@ -144,10 +203,33 @@ impl<'a> Iterator for Rows<'a> {
                 None => String::new(),
                 Some((_, &max_c)) => (self.min_col..=max_c)
                     .map(|x| {
-                        row.get(&x).map_or(BRAILLE_PATTERN_BLANK, |&off| {
-                            std::char::from_u32(BRAILLE_PATTERN_BLANK as u32 + u32::from(off))
-                                .unwrap()
-                        })
+                        row.get(&x)
+                            .map_or(BRAILLE_PATTERN_BLANK.to_string(), |pix| {
+                                let c = std::char::from_u32(
+                                    BRAILLE_PATTERN_BLANK as u32 + u32::from(pix.braille_offset),
+                                )
+                                .unwrap();
+
+                                if self.with_colors {
+                                    let (zmin, zmax) = self.canvas.zrange.unwrap();
+
+                                    // the minimum grayscale value is 35 because
+                                    // 0 seems brighter. This tricks the eye because .
+                                    let w = 255_u8
+                                        - num_traits::cast::<_, u8>(
+                                            ((pix.z - zmin) / (zmax - zmin) * 220.0).round(),
+                                        )
+                                        .unwrap();
+
+                                    format!(
+                                        "{}{}",
+                                        termion::color::Fg(termion::color::Rgb(w, w, w)),
+                                        c
+                                    )
+                                } else {
+                                    c.to_string()
+                                }
+                            })
                     })
                     .collect(),
             },
@@ -169,7 +251,7 @@ impl Default for Canvas {
 mod tests {
     use maplit::btreemap;
 
-    use super::{Canvas, Vector3};
+    use super::{Canvas, Pixel, Vector3};
 
     #[test]
     fn test_set() {
@@ -180,7 +262,7 @@ mod tests {
         assert_eq!(
             c.rows,
             btreemap!{
-                0 => btreemap!{0 => 1}
+                0 => btreemap!{0 => Pixel {braille_offset: 1, z: 0.0}}
             }
         );
     }
@@ -211,10 +293,10 @@ mod tests {
     #[test]
     fn test_frame() {
         let mut c = Canvas::new();
-        assert_eq!(c.rows().collect::<Vec<_>>(), Vec::<String>::new());
+        assert_eq!(c.rows(false).collect::<Vec<_>>(), Vec::<String>::new());
 
         c.set(Vector3::new(0.0, 0.0, 0.0));
-        assert_eq!(c.rows().collect::<Vec<_>>(), vec!["⠁".to_string()]);
+        assert_eq!(c.rows(false).collect::<Vec<_>>(), vec!["⠁".to_string()]);
     }
 
     #[test]
@@ -229,7 +311,7 @@ mod tests {
         c.line(Vector3::new(20.0, 0.0, 0.0), Vector3::new(0.0, 20.0, 0.0));
 
         assert_eq!(
-            c.rows().collect::<Vec<_>>(),
+            c.rows(false).collect::<Vec<_>>(),
             vec![
                 "⡟⢍⠉⠉⠉⠉⠉⠉⢉⠝⡇",
                 "⡇⠀⠑⢄⠀⠀⢀⠔⠁⠀⡇",
@@ -253,7 +335,7 @@ mod tests {
             ));
         }
 
-        let rows = s.rows().collect::<Vec<_>>();
+        let rows = s.rows(false).collect::<Vec<_>>();
 
         assert_eq!(rows, vec![
             "⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂⠀⠀⠀⠀⠀⡐⠊⠑⢂",
