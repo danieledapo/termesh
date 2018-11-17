@@ -33,6 +33,10 @@ impl Line {
 impl Iterator for Line {
     type Item = Vector3;
 
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, num_traits::cast(self.steps))
+    }
+
     fn next(&mut self) -> Option<Self::Item> {
         if self.steps == 0 {
             return None;
