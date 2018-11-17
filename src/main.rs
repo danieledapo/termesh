@@ -184,7 +184,7 @@ fn scale_stl(stl: &mut Stl, scale: f32) {
     }
 
     for v in stl.vertices_mut() {
-        v.scale(scale);
+        *v *= scale;
     }
 }
 
@@ -192,14 +192,7 @@ fn render_stl<W: Write>(w: &mut W, stl: &Stl, clear: bool) -> io::Result<()> {
     let mut canvas = Canvas::new();
 
     for f in &stl.facets {
-        canvas.triangle(
-            f.vertices[0].x,
-            f.vertices[0].y,
-            f.vertices[1].x,
-            f.vertices[1].y,
-            f.vertices[2].x,
-            f.vertices[2].y,
-        );
+        canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
     }
 
     // callers can clear the screen by themselves, but it usually causes
@@ -231,7 +224,8 @@ fn determine_scale_factor(stl: &Stl, max_width: u16, max_height: u16) -> f32 {
                     max_y.max(v.y),
                 )
             })
-        }).map_or((1.0, 1.0), |(min_x, min_y, max_x, max_y)| {
+        })
+        .map_or((1.0, 1.0), |(min_x, min_y, max_x, max_y)| {
             (max_x - min_x, max_y - min_y)
         });
 

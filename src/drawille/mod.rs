@@ -15,6 +15,7 @@ pub mod line;
 use std::collections::BTreeMap;
 
 use crate::utils::btree_minmax;
+use crate::vector3::Vector3;
 
 static BRAILLE_PATTERN_BLANK: char = '\u{2800}';
 static BRAILLE_OFFSET_MAP: [[u8; 2]; 4] = [
@@ -61,15 +62,15 @@ impl Canvas {
         self.rows.clear();
     }
 
-    pub fn triangle(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) {
-        self.line(x1, y1, x2, y2);
-        self.line(x1, y1, x3, y3);
-        self.line(x2, y2, x3, y3);
+    pub fn triangle(&mut self, p0: Vector3, p1: Vector3, p2: Vector3) {
+        self.line(p0, p1);
+        self.line(p0, p2);
+        self.line(p1, p2);
     }
 
-    pub fn line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32) {
-        for (x, y) in line::Line::new(x1.round(), y1.round(), x2.round(), y2.round()) {
-            self.set(x, y);
+    pub fn line(&mut self, p0: Vector3, p1: Vector3) {
+        for p in line::Line::new(p0.round(), p1.round()) {
+            self.set(p.x, p.y);
         }
     }
 
@@ -167,7 +168,8 @@ impl<'a> Iterator for Rows<'a> {
                             std::char::from_u32(BRAILLE_PATTERN_BLANK as u32 + u32::from(off))
                                 .unwrap()
                         })
-                    }).collect(),
+                    })
+                    .collect(),
             },
         };
 
@@ -187,7 +189,7 @@ impl Default for Canvas {
 mod tests {
     use maplit::btreemap;
 
-    use super::Canvas;
+    use super::{Canvas, Vector3};
 
     #[test]
     fn test_set() {
@@ -260,12 +262,12 @@ mod tests {
     fn test_rect() {
         let mut c = Canvas::new();
 
-        c.line(0.0, 0.0, 20.0, 0.0);
-        c.line(20.0, 0.0, 20.0, 20.0);
-        c.line(0.0, 20.0, 20.0, 20.0);
-        c.line(0.0, 0.0, 0.0, 20.0);
-        c.line(0.0, 0.0, 20.0, 20.0);
-        c.line(20.0, 0.0, 0.0, 20.0);
+        c.line(Vector3::new(0.0, 0.0, 0.0), Vector3::new(20.0, 0.0, 0.0));
+        c.line(Vector3::new(20.0, 0.0, 0.0), Vector3::new(20.0, 20.0, 0.0));
+        c.line(Vector3::new(0.0, 20.0, 0.0), Vector3::new(20.0, 20.0, 0.0));
+        c.line(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 20.0, 0.0));
+        c.line(Vector3::new(0.0, 0.0, 0.0), Vector3::new(20.0, 20.0, 0.0));
+        c.line(Vector3::new(20.0, 0.0, 0.0), Vector3::new(0.0, 20.0, 0.0));
 
         assert_eq!(
             c.rows().collect::<Vec<_>>(),
