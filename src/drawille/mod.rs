@@ -80,26 +80,6 @@ impl Canvas {
         *self.rows.entry(r).or_default().entry(c).or_default() |= braille_offset_at(p.x, p.y);
     }
 
-    pub fn unset(&mut self, x: f32, y: f32) {
-        use std::collections::btree_map::Entry;
-
-        let (c, r) = canvas_pos(x, y);
-
-        if let Entry::Occupied(mut row) = self.rows.entry(r) {
-            if let Entry::Occupied(mut c) = row.get_mut().entry(c) {
-                *c.get_mut() &= !braille_offset_at(x, y);
-
-                if *c.get() == 0 {
-                    c.remove();
-                }
-            }
-
-            if row.get().is_empty() {
-                row.remove();
-            }
-        }
-    }
-
     pub fn is_set(&self, x: f32, y: f32) -> bool {
         let dot_index = braille_offset_at(x, y);
         let (x, y) = canvas_pos(x, y);
@@ -203,27 +183,6 @@ mod tests {
                 0 => btreemap!{0 => 1}
             }
         );
-    }
-
-    #[test]
-    fn test_unset_empty() {
-        let mut c = Canvas::new();
-
-        c.set(Vector3::new(1.0, 1.0, 1.0));
-        c.unset(1.0, 1.0);
-
-        assert_eq!(c.rows, btreemap!{});
-    }
-
-    #[test]
-    fn test_unset_non_empty() {
-        let mut c = Canvas::new();
-
-        c.set(Vector3::new(0.0, 0.0, 0.0));
-        c.set(Vector3::new(1.0, 1.0, 0.0));
-        c.unset(1.0, 1.0);
-
-        assert_eq!(c.rows, btreemap!{ 0 => btreemap!{ 0 => 1 }});
     }
 
     #[test]
