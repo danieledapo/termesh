@@ -119,7 +119,7 @@ fn interactive(stl: Stl) -> io::Result<()> {
 
     scale_and_draw(stl.clone())?;
 
-    let angle_inc = PI / 4.0;
+    let angle_inc = PI / 6.0;
 
     let mut rotation_x = 0.0;
     let mut rotation_y = 0.0;
