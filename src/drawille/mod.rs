@@ -70,14 +70,14 @@ impl Canvas {
 
     pub fn line(&mut self, p0: Vector3, p1: Vector3) {
         for p in line::Line::new(p0.round(), p1.round()) {
-            self.set(p.x, p.y);
+            self.set(p);
         }
     }
 
-    pub fn set(&mut self, x: f32, y: f32) {
-        let (c, r) = canvas_pos(x, y);
+    pub fn set(&mut self, p: Vector3) {
+        let (c, r) = canvas_pos(p.x, p.y);
 
-        *self.rows.entry(r).or_default().entry(c).or_default() |= braille_offset_at(x, y);
+        *self.rows.entry(r).or_default().entry(c).or_default() |= braille_offset_at(p.x, p.y);
     }
 
     pub fn unset(&mut self, x: f32, y: f32) {
@@ -195,7 +195,7 @@ mod tests {
     fn test_set() {
         let mut c = Canvas::new();
 
-        c.set(0.0, 0.0);
+        c.set(Vector3::new(0.0, 0.0, 0.0));
 
         assert_eq!(
             c.rows,
@@ -209,7 +209,7 @@ mod tests {
     fn test_unset_empty() {
         let mut c = Canvas::new();
 
-        c.set(1.0, 1.0);
+        c.set(Vector3::new(1.0, 1.0, 1.0));
         c.unset(1.0, 1.0);
 
         assert_eq!(c.rows, btreemap!{});
@@ -219,8 +219,8 @@ mod tests {
     fn test_unset_non_empty() {
         let mut c = Canvas::new();
 
-        c.set(0.0, 0.0);
-        c.set(1.0, 1.0);
+        c.set(Vector3::new(0.0, 0.0, 0.0));
+        c.set(Vector3::new(1.0, 1.0, 0.0));
         c.unset(1.0, 1.0);
 
         assert_eq!(c.rows, btreemap!{ 0 => btreemap!{ 0 => 1 }});
@@ -230,7 +230,7 @@ mod tests {
     fn test_clear() {
         let mut c = Canvas::new();
 
-        c.set(1.0, 1.0);
+        c.set(Vector3::new(1.0, 1.0, 0.0));
         c.clear();
 
         assert_eq!(c.rows, btreemap!{});
@@ -242,7 +242,7 @@ mod tests {
 
         assert!(!c.is_set(0.0, 0.0));
 
-        c.set(0.0, 0.0);
+        c.set(Vector3::new(0.0, 0.0, 0.0));
         assert!(c.is_set(0.0, 0.0));
         assert!(!c.is_set(0.0, 1.0));
         assert!(!c.is_set(1.0, 0.0));
@@ -254,7 +254,7 @@ mod tests {
         let mut c = Canvas::new();
         assert_eq!(c.rows().collect::<Vec<_>>(), Vec::<String>::new());
 
-        c.set(0.0, 0.0);
+        c.set(Vector3::new(0.0, 0.0, 0.0));
         assert_eq!(c.rows().collect::<Vec<_>>(), vec!["⠁".to_string()]);
     }
 
@@ -287,10 +287,11 @@ mod tests {
         let mut s = Canvas::new();
 
         for x in (0_u16..3600).step_by(20) {
-            s.set(
+            s.set(Vector3::new(
                 f32::from(x) / 20.0,
                 (4.0 + f32::from(x).to_radians().sin() * 4.0).round(),
-            );
+                0.0,
+            ));
         }
 
         let rows = s.rows().collect::<Vec<_>>();
