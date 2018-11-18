@@ -187,6 +187,30 @@ impl<'a> Rows<'a> {
             with_colors,
         }
     }
+
+    fn braille(&self, pix: &Pixel) -> String {
+        let c = std::char::from_u32(BRAILLE_PATTERN_BLANK as u32 + u32::from(pix.braille_offset))
+            .unwrap();
+
+        if !self.with_colors {
+            return c.to_string();
+        }
+
+        let (zmin, zmax) = self.canvas.zrange.unwrap();
+
+        // Use the ANSI grayscales as a form of alpha channel to simulate depth.
+        // The first shades of black are not taken into account because they're
+        // too bright which makes the eyes think the pixel is closer even though
+        // it's not.
+        let gray = 23_u8
+            - num_traits::cast::<_, u8>(((pix.z - zmin) / (zmax - zmin) * 20.0).round()).unwrap();
+
+        format!(
+            "{}{}",
+            termion::color::Fg(termion::color::AnsiValue::grayscale(gray)),
+            c
+        )
+    }
 }
 
 impl<'a> Iterator for Rows<'a> {
@@ -204,32 +228,7 @@ impl<'a> Iterator for Rows<'a> {
                 Some((_, &max_c)) => (self.min_col..=max_c)
                     .map(|x| {
                         row.get(&x)
-                            .map_or(BRAILLE_PATTERN_BLANK.to_string(), |pix| {
-                                let c = std::char::from_u32(
-                                    BRAILLE_PATTERN_BLANK as u32 + u32::from(pix.braille_offset),
-                                )
-                                .unwrap();
-
-                                if self.with_colors {
-                                    let (zmin, zmax) = self.canvas.zrange.unwrap();
-
-                                    // the minimum grayscale value is 35 because
-                                    // 0 seems brighter. This tricks the eye because .
-                                    let w = 255_u8
-                                        - num_traits::cast::<_, u8>(
-                                            ((pix.z - zmin) / (zmax - zmin) * 220.0).round(),
-                                        )
-                                        .unwrap();
-
-                                    format!(
-                                        "{}{}",
-                                        termion::color::Fg(termion::color::Rgb(w, w, w)),
-                                        c
-                                    )
-                                } else {
-                                    c.to_string()
-                                }
-                            })
+                            .map_or(BRAILLE_PATTERN_BLANK.to_string(), |pix| self.braille(pix))
                     })
                     .collect(),
             },
