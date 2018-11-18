@@ -158,11 +158,20 @@ fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
             termion::event::Key::Char('x') => {
                 rotation_x = (rotation_x + angle_inc) % (2.0 * PI);
             }
+            termion::event::Key::Char('X') => {
+                rotation_x = (rotation_x - angle_inc) % (2.0 * PI);
+            }
             termion::event::Key::Char('y') => {
                 rotation_y = (rotation_y + angle_inc) % (2.0 * PI);
             }
+            termion::event::Key::Char('Y') => {
+                rotation_y = (rotation_y - angle_inc) % (2.0 * PI);
+            }
             termion::event::Key::Char('z') => {
                 rotation_z = (rotation_z + angle_inc) % (2.0 * PI);
+            }
+            termion::event::Key::Char('Z') => {
+                rotation_z = (rotation_z - angle_inc) % (2.0 * PI);
             }
             _ => continue,
         }
