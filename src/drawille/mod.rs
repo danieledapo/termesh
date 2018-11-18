@@ -74,33 +74,8 @@ impl Canvas {
         self.rows.clear();
     }
 
-    pub fn triangle(&mut self, p0: Vector3, p1: Vector3, p2: Vector3) {
-        self.line(p0, p1);
-        self.line(p0, p2);
-        self.line(p1, p2);
-    }
-
-    pub fn fill_triangle(&mut self, mut p0: Vector3, mut p1: Vector3, mut p2: Vector3) {
-        // TODO: doesn't seem to completely fill triangles...
-
-        // ensure p0 is the point with highest y, then comes p1 and then p2
-        if p1.y < p0.y {
-            std::mem::swap(&mut p0, &mut p1);
-        }
-        if p2.y < p0.y {
-            std::mem::swap(&mut p0, &mut p2);
-        }
-        if p2.y < p1.y {
-            std::mem::swap(&mut p1, &mut p2);
-        }
-
-        for (line_start, line_end) in line::Line::new(p0, p1).zip(line::Line::new(p0, p2)) {
-            self.line(line_start, line_end);
-        }
-
-        for (line_start, line_end) in line::Line::new(p2, p0).zip(line::Line::new(p2, p1)) {
-            self.line(line_start, line_end);
-        }
+    pub fn rows(&self, with_colors: bool) -> Rows {
+        Rows::new(self, with_colors)
     }
 
     pub fn line(&mut self, p0: Vector3, p1: Vector3) {
@@ -147,8 +122,47 @@ impl Canvas {
             .map_or(false, |c| c.braille_offset & dot_index != 0)
     }
 
-    pub fn rows(&self, with_colors: bool) -> Rows {
-        Rows::new(self, with_colors)
+    pub fn triangle(&mut self, p0: Vector3, p1: Vector3, p2: Vector3) {
+        let midz = (p0.z + p1.z + p2.z) / 3.0;
+        self.triangle_line(p0, p1, midz);
+        self.triangle_line(p0, p2, midz);
+        self.triangle_line(p1, p2, midz);
+    }
+
+    pub fn fill_triangle(&mut self, mut p0: Vector3, mut p1: Vector3, mut p2: Vector3) {
+        // TODO: doesn't seem to completely fill triangles, might be because of
+        // depth or float being useless...
+
+        // ensure p0 is the point with highest y, then comes p1 and then p2
+        if p1.y < p0.y {
+            std::mem::swap(&mut p0, &mut p1);
+        }
+        if p2.y < p0.y {
+            std::mem::swap(&mut p0, &mut p2);
+        }
+        if p2.y < p1.y {
+            std::mem::swap(&mut p1, &mut p2);
+        }
+
+        let midz = (p0.z + p1.z + p2.z) / 3.0;
+
+        for (line_start, line_end) in line::Line::new(p0, p1).zip(line::Line::new(p0, p2)) {
+            self.triangle_line(line_start, line_end, midz);
+        }
+
+        for (line_start, line_end) in line::Line::new(p2, p0).zip(line::Line::new(p2, p1)) {
+            self.triangle_line(line_start, line_end, midz);
+        }
+
+        self.triangle(p0, p1, p2);
+    }
+
+    // lines for triangles all have the same z for flat shading
+    fn triangle_line(&mut self, p0: Vector3, p1: Vector3, z: f32) {
+        for mut p in line::Line::new(p0.round(), p1.round()) {
+            p.z = z;
+            self.set(p);
+        }
     }
 }
 
