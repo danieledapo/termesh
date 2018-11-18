@@ -25,13 +25,6 @@ static BRAILLE_OFFSET_MAP: [[u8; 2]; 4] = [
     [0x40, 0x80], // "⡀" , "⢀"
 ];
 
-fn canvas_pos(x: f32, y: f32) -> (i32, i32) {
-    (
-        (x.round() / 2.0).floor() as i32,
-        (y.round() / 4.0).floor() as i32,
-    )
-}
-
 fn braille_offset_at(x: f32, y: f32) -> u8 {
     let mut xoff = x.round() % 2.0;
     if xoff < 0.0 {
@@ -70,12 +63,61 @@ impl Canvas {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.rows.clear();
+    // convert coordinates from user space to canvas space
+    pub fn pos(x: f32, y: f32) -> (i32, i32) {
+        (
+            (x.round() / 2.0).floor() as i32,
+            (y.round() / 4.0).floor() as i32,
+        )
     }
 
     pub fn rows(&self, with_colors: bool) -> Rows {
-        Rows::new(self, with_colors)
+        let (min_row, max_row, min_col, max_col) =
+            self.dimensions().unwrap_or((i32::max_value(), 0, 0, 0));
+
+        self.frame(with_colors, min_row, max_row, min_col, max_col)
+    }
+
+    /// bounds are in canvas space, use `pos` to perform the conversion if
+    /// needed.
+    pub fn frame(
+        &self,
+        with_colors: bool,
+        min_row: i32,
+        max_row: i32,
+        min_col: i32,
+        _max_col: i32,
+    ) -> Rows {
+        Rows {
+            canvas: self,
+            min_row,
+            max_row,
+            min_col,
+            with_colors,
+        }
+    }
+
+    // Get a tuple with the minimum row, maximum row, minimum column and maximum
+    // column values in canvas space.
+    pub fn dimensions(&self) -> Option<(i32, i32, i32, i32)> {
+        btree_minmax(&self.rows).map(|(&min_row, &max_row)| {
+            let (min_c, max_c) = self
+                .rows
+                .values()
+                .map(|r| btree_minmax(r).unwrap_or((&0, &0)))
+                .fold(
+                    (i32::max_value(), i32::min_value()),
+                    |(min_c, max_c), (row_min_c, row_max_c)| {
+                        (min_c.min(*row_min_c), max_c.max(*row_max_c))
+                    },
+                );
+
+            (min_row, max_row, min_c, max_c)
+        })
+    }
+
+    pub fn clear(&mut self) {
+        self.rows.clear();
     }
 
     pub fn line(&mut self, p0: Vector3, p1: Vector3) {
@@ -87,7 +129,7 @@ impl Canvas {
     pub fn set(&mut self, p: Vector3) {
         use std::collections::btree_map::Entry;
 
-        let (c, r) = canvas_pos(p.x, p.y);
+        let (c, r) = Self::pos(p.x, p.y);
 
         self.zrange = match self.zrange {
             None => Some((p.z, p.z)),
@@ -114,7 +156,7 @@ impl Canvas {
 
     pub fn is_set(&self, x: f32, y: f32) -> bool {
         let dot_index = braille_offset_at(x, y);
-        let (x, y) = canvas_pos(x, y);
+        let (x, y) = Self::pos(x, y);
 
         self.rows
             .get(&y)
@@ -176,32 +218,6 @@ pub struct Rows<'a> {
 }
 
 impl<'a> Rows<'a> {
-    fn new(canvas: &'a Canvas, with_colors: bool) -> Self {
-        let (min_row, max_row, min_col) = match btree_minmax(&canvas.rows) {
-            None => (i32::max_value(), 0, 0),
-            Some((&min_row, &max_row)) => {
-                let min_c = canvas
-                    .rows
-                    .values()
-                    .flat_map(|row| btree_minmax(row).map(|(m, _)| m))
-                    .min();
-
-                // if btree_minmax(&canvas.rows) succeeded there's no way this can fail
-                let &min_c = min_c.unwrap();
-
-                (min_row, max_row, min_c)
-            }
-        };
-
-        Self {
-            canvas,
-            min_row,
-            max_row,
-            min_col,
-            with_colors,
-        }
-    }
-
     fn braille(&self, pix: &Pixel) -> String {
         let c = std::char::from_u32(BRAILLE_PATTERN_BLANK as u32 + u32::from(pix.braille_offset))
             .unwrap();

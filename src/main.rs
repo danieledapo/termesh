@@ -116,6 +116,7 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
         &mut stdout,
         &stl,
         false,
+        None,
         &RenderConfig {
             no_colors: true,
             fill: false,
@@ -127,6 +128,7 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
 
 fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
     let mut stdout = io::stdout().into_raw_mode()?;
+    // let mut stdout = io::stdout();
     write!(stdout, "{}\r\n", termion::cursor::Hide)?;
 
     let mut scale_and_draw = |mut stl| -> io::Result<()> {
@@ -137,7 +139,16 @@ fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
             determine_scale_factor(&stl, terminal_size.0 - padding, terminal_size.1 - padding);
 
         scale_stl(&mut stl, scale);
-        render_stl(&mut stdout, &stl, true, &config)?;
+        render_stl(
+            &mut stdout,
+            &stl,
+            true,
+            Some((
+                i32::from(terminal_size.0 - padding),
+                i32::from(terminal_size.1 - padding),
+            )),
+            &config,
+        )?;
 
         Ok(())
     };
@@ -226,6 +237,7 @@ fn render_stl<W: Write>(
     w: &mut W,
     stl: &Stl,
     clear: bool,
+    max_dimensions: Option<(i32, i32)>,
     render_config: &RenderConfig,
 ) -> io::Result<()> {
     let mut canvas = Canvas::new();
@@ -241,18 +253,42 @@ fn render_stl<W: Write>(
     }
 
     // callers can clear the screen by themselves, but it usually causes
-    // flickering on big terminals therefore defer clearing the screen until the
-    // very last.
+    // flickering on big terminals. Therefore defer clearing the screen until
+    // the very last.
     if clear {
         clear_screen(w)?;
     }
 
-    for r in canvas.rows(!render_config.no_colors) {
-        write!(w, "{}\r\n", r)?;
-    }
-    w.flush()?;
+    match max_dimensions {
+        None => {
+            for r in canvas.rows(!render_config.no_colors) {
+                write!(w, "{}\r\n", r)?;
+            }
+            w.flush()
+        }
+        Some((max_width, max_height)) => {
+            if let Some((min_r, max_r, min_c, max_c)) = canvas.dimensions() {
+                let padded = |min, max, max_len| {
+                    if max_len <= max - min {
+                        min
+                    } else {
+                        let padding = max_len - (max - min);
+                        min - padding / 2
+                    }
+                };
 
-    Ok(())
+                let min_r = padded(min_r, max_r, max_height);
+                let min_c = padded(min_c, max_c, max_width);
+
+                for r in canvas.frame(!render_config.no_colors, min_r, max_r, min_c, max_c) {
+                    write!(w, "{}\r\n", r)?;
+                }
+                w.flush()?;
+            }
+
+            Ok(())
+        }
+    }
 }
 
 fn determine_scale_factor(stl: &Stl, max_width: u16, max_height: u16) -> f32 {
