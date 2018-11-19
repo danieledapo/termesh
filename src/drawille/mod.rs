@@ -177,8 +177,7 @@ impl Canvas {
     }
 
     pub fn fill_triangle(&mut self, mut p0: Vector3, mut p1: Vector3, mut p2: Vector3) {
-        // TODO: doesn't seem to completely fill triangles, might be because of
-        // depth or float being useless...
+        // TODO: speed this up
 
         // ensure p0 is the point with highest y, then comes p1 and then p2
         if p1.y < p0.y {
@@ -198,6 +197,10 @@ impl Canvas {
         }
 
         for (line_start, line_end) in line::Line::new(p2, p0).zip(line::Line::new(p2, p1)) {
+            self.triangle_line(line_start, line_end, midz);
+        }
+
+        for (line_start, line_end) in line::Line::new(p1, p0).zip(line::Line::new(p1, p2)) {
             self.triangle_line(line_start, line_end, midz);
         }
 
