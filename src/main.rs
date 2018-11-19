@@ -42,9 +42,9 @@ struct RenderConfig {
     #[structopt(long = "no-colors")]
     no_colors: bool,
 
-    /// Fill triangles.
-    #[structopt(short = "f", long = "fill")]
-    fill: bool,
+    /// Display only the wireframe of the mesh.
+    #[structopt(short = "w", long = "wireframe")]
+    only_wireframe: bool,
 }
 
 #[derive(Debug, StructOpt)]
@@ -77,7 +77,7 @@ fn main() -> io::Result<()> {
 
     let default_command = Command::Render(RenderConfig {
         no_colors: false,
-        fill: false,
+        only_wireframe: false,
     });
 
     match app.command.unwrap_or(default_command) {
@@ -119,7 +119,7 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
         None,
         &RenderConfig {
             no_colors: true,
-            fill: false,
+            only_wireframe: true,
         },
     )?;
 
@@ -240,13 +240,13 @@ fn render_stl<W: Write>(
 ) -> io::Result<()> {
     let mut canvas = Canvas::new();
 
-    if render_config.fill {
+    if render_config.only_wireframe {
         for f in &stl.facets {
-            canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+            canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
         }
     } else {
         for f in &stl.facets {
-            canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+            canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
         }
     }
 
