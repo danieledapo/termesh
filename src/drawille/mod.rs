@@ -56,6 +56,11 @@ struct Pixel {
 }
 
 impl Canvas {
+    /// The optimal background color for rendering the Canvas
+    pub fn background_color() -> impl termion::color::Color {
+        termion::color::AnsiValue::grayscale(3)
+    }
+
     pub fn new() -> Self {
         Canvas {
             rows: BTreeMap::new(),
@@ -232,8 +237,8 @@ impl<'a> Rows<'a> {
         // The first shades of black are not taken into account because they're
         // too bright which makes the eyes think the pixel is closer even though
         // it's not.
-        let gray = 23_u8
-            - num_traits::cast::<_, u8>(((pix.z - zmin) / (zmax - zmin) * 20.0).round()).unwrap();
+        let gray = 23
+            - num_traits::cast::<_, u8>(((pix.z - zmin) / (zmax - zmin) * 19.0).round()).unwrap();
 
         format!(
             "{}{}",

@@ -143,10 +143,7 @@ fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
             &mut stdout,
             &stl,
             true,
-            Some((
-                i32::from(terminal_size.0 - padding),
-                i32::from(terminal_size.1 - padding),
-            )),
+            Some((i32::from(terminal_size.0), i32::from(terminal_size.1))),
             &config,
         )?;
 
@@ -194,7 +191,8 @@ fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
 
     write!(
         stdout,
-        "{}{}{}\r\n",
+        "{}{}{}{}\r\n",
+        termion::color::Bg(termion::color::Reset),
         termion::clear::All,
         termion::cursor::Goto(1, 1),
         termion::cursor::Show
@@ -256,6 +254,15 @@ fn render_stl<W: Write>(
     // flickering on big terminals. Therefore defer clearing the screen until
     // the very last.
     if clear {
+        // changing the background color needs clearing before it can be
+        // rendered effectively
+        if !render_config.no_colors {
+            write!(
+                w,
+                "{}",
+                termion::color::Bg(termesh::drawille::Canvas::background_color())
+            )?;
+        }
         clear_screen(w)?;
     }
 
