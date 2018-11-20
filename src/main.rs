@@ -287,7 +287,7 @@ fn render_stl<W: Write>(
                 let min_r = padded(min_r, max_r, max_height);
                 let min_c = padded(min_c, max_c, max_width);
 
-                for r in canvas.frame(!render_config.no_colors, min_r, max_r, min_c, max_c) {
+                for r in canvas.frame(!render_config.no_colors, min_r, max_r, min_c, Some(max_c)) {
                     write!(w, "{}\r\n", r)?;
                 }
                 w.flush()?;

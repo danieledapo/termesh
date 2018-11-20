@@ -77,27 +77,33 @@ impl Canvas {
     }
 
     pub fn rows(&self, with_colors: bool) -> Rows {
-        let (min_row, max_row, min_col, max_col) =
+        let (min_row, max_row, min_col, _) =
             self.dimensions().unwrap_or((i32::max_value(), 0, 0, 0));
 
-        self.frame(with_colors, min_row, max_row, min_col, max_col)
+        self.frame(with_colors, min_row, max_row, min_col, None)
     }
 
     /// bounds are in canvas space, use `pos` to perform the conversion if
     /// needed.
+    ///
+    /// If `max_col` is `None` then each row is composed by the minimum
+    /// characters for that row only and that each row possibly has a different
+    /// length. On the other hand, when it's `Some(width)` all rows will have
+    /// the same length.
     pub fn frame(
         &self,
         with_colors: bool,
         min_row: i32,
         max_row: i32,
         min_col: i32,
-        _max_col: i32,
+        max_col: Option<i32>,
     ) -> Rows {
         Rows {
             canvas: self,
             min_row,
             max_row,
             min_col,
+            max_col,
             with_colors,
         }
     }
@@ -223,6 +229,7 @@ pub struct Rows<'a> {
     min_row: i32,
     max_row: i32,
     min_col: i32,
+    max_col: Option<i32>,
 }
 
 impl<'a> Rows<'a> {
@@ -265,9 +272,12 @@ impl<'a> Iterator for Rows<'a> {
 
         let row = match self.canvas.rows.get(&self.min_row) {
             None => String::new(),
-            Some(row) => match btree_minmax(row) {
+            Some(row) => match self
+                .max_col
+                .or_else(|| btree_minmax(row).map(|(_, &mc)| mc))
+            {
                 None => String::new(),
-                Some((_, &max_c)) => (self.min_col..=max_c)
+                Some(max_c) => (self.min_col..=max_c)
                     .map(|x| {
                         row.get(&x)
                             .map_or(BRAILLE_PATTERN_BLANK.to_string(), |pix| self.braille(pix))
