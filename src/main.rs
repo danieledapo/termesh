@@ -13,94 +13,56 @@ use termion::raw::IntoRawMode;
 use termesh::drawille::Canvas;
 use termesh::stl::Stl;
 
-/// Display 3d objects in the terminal using Braille characters.
+/// Display 3D objects in the terminal using Braille characters.
 #[derive(Debug, StructOpt)]
 struct App {
-    #[structopt(subcommand)]
-    command: Option<Command>,
-
-    /// Input mesh to display. Only binary STL as of now.
-    #[structopt(short = "m", long = "mesh", parse(from_os_str))]
-    mesh_filepath: PathBuf,
-}
-
-#[derive(Debug, StructOpt)]
-enum Command {
-    /// Interactively render an input mesh in the terminal.
-    #[structopt(name = "render")]
-    Render(RenderConfig),
-
-    /// Dump an input mesh in the terminal.
-    #[structopt(name = "dump")]
-    Dump(DumpConfig),
-}
-
-#[derive(Debug, StructOpt)]
-struct RenderConfig {
-    /// Do not render using true colors. This will effectively make the depth
-    /// all the same.
-    #[structopt(long = "no-colors")]
-    no_colors: bool,
-
-    /// Display only the wireframe of the mesh.
-    #[structopt(short = "w", long = "wireframe")]
-    only_wireframe: bool,
-}
-
-#[derive(Debug, StructOpt)]
-struct DumpConfig {
-    /// Scale the input mesh by a given factor before dumping.
-    #[structopt(short = "s", long = "scale", default_value = "1")]
-    scale: f32,
+    /// Scale the input mesh by a given factor. If passed disables autoscaling.
+    #[structopt(short = "s", long = "scale")]
+    scale: Option<f32>,
 
     /// Rotate the input mesh around the x axis by a given angle in radians
-    /// before dumping.
+    /// before displaying.
     #[structopt(short = "x", long = "rotation-x", default_value = "0")]
     rotation_x: f32,
 
     /// Rotate the input mesh around the y axis by a given angle in radians
-    /// before dumping.
+    /// before displaying.
     #[structopt(short = "y", long = "rotation-y", default_value = "0")]
     rotation_y: f32,
 
     /// Rotate the input mesh around the z axis by a given angle in radians
-    /// before dumping.
+    /// before displaying.
     #[structopt(short = "z", long = "rotation-z", default_value = "0")]
     rotation_z: f32,
+
+    /// Do not render using true colors. This will effectively make the depth
+    /// all the same.
+    #[structopt(long = "no-depth")]
+    no_depth: bool,
+
+    /// Display only the wireframe of the mesh.
+    #[structopt(short = "w", long = "wireframe")]
+    only_wireframe: bool,
+
+    /// Input mesh to display. Only binary STL as of now.
+    #[structopt(parse(from_os_str))]
+    mesh_filepath: PathBuf,
 }
 
 fn main() -> io::Result<()> {
     let app = App::from_args();
 
-    let mut f = File::open(app.mesh_filepath)?;
+    let mut f = File::open(&app.mesh_filepath)?;
     let stl = Stl::parse_binary(&mut f)?;
 
-    let default_command = Command::Render(RenderConfig {
-        no_colors: false,
-        only_wireframe: false,
-    });
-
-    match app.command.unwrap_or(default_command) {
-        Command::Render(config) => {
-            if termion::is_tty(&io::stdout()) {
-                interactive(config, stl)
-            } else {
-                non_interactive(
-                    DumpConfig {
-                        scale: 1.0,
-                        rotation_x: 0.0,
-                        rotation_y: 0.0,
-                        rotation_z: 0.0,
-                    },
-                    stl,
-                )
-            }
-        }
-        Command::Dump(config) => non_interactive(config, stl),
+    if termion::is_tty(&io::stdout()) {
+        interactive(app, stl)
+    } else {
+        non_interactive(app, stl)
     }
 }
 
-fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
+fn non_interactive(config: App, mut stl: Stl) -> io::Result<()> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
 
@@ -110,33 +72,28 @@ fn non_interactive(config: DumpConfig, mut stl: Stl) -> io::Result<()> {
         config.rotation_y,
         config.rotation_z,
     );
-    scale_stl(&mut stl, config.scale);
+    scale_stl(&mut stl, config.scale.unwrap_or(1.0));
 
-    render_stl(
-        &mut stdout,
-        &stl,
-        false,
-        None,
-        &RenderConfig {
-            no_colors: true,
-            only_wireframe: true,
-        },
-    )?;
+    render_stl(&mut stdout, &stl, false, None, &config)?;
 
     Ok(())
 }
 
-fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
+fn interactive(mut config: App, stl: Stl) -> io::Result<()> {
     let mut stdout = io::stdout().into_raw_mode()?;
-    // let mut stdout = io::stdout();
     write!(stdout, "{}\r\n", termion::cursor::Hide)?;
 
-    let mut scale_and_draw = |mut stl| -> io::Result<()> {
+    let angle_inc = PI / 6.0;
+
+    let mut draw = |c: &App, mut stl| -> io::Result<()> {
         let terminal_size = termion::terminal_size()?;
 
+        rotate_stl(&mut stl, c.rotation_x, c.rotation_y, c.rotation_z);
+
         let padding = 5;
-        let scale =
-            determine_scale_factor(&stl, terminal_size.0 - padding, terminal_size.1 - padding);
+        let scale = c.scale.unwrap_or_else(|| {
+            determine_scale_factor(&stl, terminal_size.0 - padding, terminal_size.1 - padding)
+        });
 
         scale_stl(&mut stl, scale);
         render_stl(
@@ -144,19 +101,13 @@ fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
             &stl,
             true,
             Some((i32::from(terminal_size.0), i32::from(terminal_size.1))),
-            &config,
+            c,
         )?;
 
         Ok(())
     };
 
-    scale_and_draw(stl.clone())?;
-
-    let angle_inc = PI / 6.0;
-
-    let mut rotation_x = 0.0;
-    let mut rotation_y = 0.0;
-    let mut rotation_z = 0.0;
+    draw(&config, stl.clone())?;
 
     for ev in io::stdin().keys() {
         let ev = ev?;
@@ -164,29 +115,27 @@ fn interactive(config: RenderConfig, stl: Stl) -> io::Result<()> {
         match ev {
             termion::event::Key::Char('q') => break,
             termion::event::Key::Char('x') => {
-                rotation_x = (rotation_x + angle_inc) % (2.0 * PI);
+                config.rotation_x = (config.rotation_x + angle_inc) % (2.0 * PI);
             }
             termion::event::Key::Char('X') => {
-                rotation_x = (rotation_x - angle_inc) % (2.0 * PI);
+                config.rotation_x = (config.rotation_x - angle_inc) % (2.0 * PI);
             }
             termion::event::Key::Char('y') => {
-                rotation_y = (rotation_y + angle_inc) % (2.0 * PI);
+                config.rotation_y = (config.rotation_y + angle_inc) % (2.0 * PI);
             }
             termion::event::Key::Char('Y') => {
-                rotation_y = (rotation_y - angle_inc) % (2.0 * PI);
+                config.rotation_y = (config.rotation_y - angle_inc) % (2.0 * PI);
             }
             termion::event::Key::Char('z') => {
-                rotation_z = (rotation_z + angle_inc) % (2.0 * PI);
+                config.rotation_z = (config.rotation_z + angle_inc) % (2.0 * PI);
             }
             termion::event::Key::Char('Z') => {
-                rotation_z = (rotation_z - angle_inc) % (2.0 * PI);
+                config.rotation_z = (config.rotation_z - angle_inc) % (2.0 * PI);
             }
             _ => continue,
         }
 
-        let mut stl = stl.clone();
-        rotate_stl(&mut stl, rotation_x, rotation_y, rotation_z);
-        scale_and_draw(stl)?;
+        draw(&config, stl.clone())?;
     }
 
     write!(
@@ -236,11 +185,11 @@ fn render_stl<W: Write>(
     stl: &Stl,
     clear: bool,
     max_dimensions: Option<(i32, i32)>,
-    render_config: &RenderConfig,
+    config: &App,
 ) -> io::Result<()> {
     let mut canvas = Canvas::new();
 
-    if render_config.only_wireframe {
+    if config.only_wireframe {
         for f in &stl.facets {
             canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
         }
@@ -256,7 +205,7 @@ fn render_stl<W: Write>(
     if clear {
         // changing the background color needs clearing before it can be
         // rendered effectively
-        if !render_config.no_colors {
+        if !config.no_depth {
             write!(
                 w,
                 "{}",
@@ -268,7 +217,7 @@ fn render_stl<W: Write>(
 
     match max_dimensions {
         None => {
-            for r in canvas.rows(!render_config.no_colors) {
+            for r in canvas.rows(!config.no_depth) {
                 write!(w, "{}\r\n", r)?;
             }
             w.flush()
@@ -287,7 +236,7 @@ fn render_stl<W: Write>(
                 let min_r = padded(min_r, max_r, max_height);
                 let min_c = padded(min_c, max_c, max_width);
 
-                for r in canvas.frame(!render_config.no_colors, min_r, max_r, min_c, Some(max_c)) {
+                for r in canvas.frame(!config.no_depth, min_r, max_r, min_c, Some(max_c)) {
                     write!(w, "{}\r\n", r)?;
                 }
                 w.flush()?;
