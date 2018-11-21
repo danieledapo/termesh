@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+use std::time;
 
 use structopt::StructOpt;
 
@@ -85,7 +86,7 @@ fn interactive(mut config: App, stl: Stl) -> io::Result<()> {
 
     let angle_inc = PI / 6.0;
 
-    let mut draw = |c: &App, mut stl| -> io::Result<()> {
+    let mut draw = |c: &App, mut stl| -> io::Result<Vec<String>> {
         let terminal_size = termion::terminal_size()?;
 
         rotate_stl(&mut stl, c.rotation_x, c.rotation_y, c.rotation_z);
@@ -102,52 +103,138 @@ fn interactive(mut config: App, stl: Stl) -> io::Result<()> {
             true,
             Some((i32::from(terminal_size.0), i32::from(terminal_size.1))),
             c,
-        )?;
-
-        Ok(())
+        )
     };
 
-    draw(&config, stl.clone())?;
+    let mut current_frame = draw(&config, stl.clone())?;
 
     for ev in io::stdin().keys() {
         let ev = ev?;
 
-        match ev {
+        let redraw = match ev {
             termion::event::Key::Char('q') => break,
             termion::event::Key::Char('x') => {
                 config.rotation_x = (config.rotation_x + angle_inc) % (2.0 * PI);
+                true
             }
             termion::event::Key::Char('X') => {
                 config.rotation_x = (config.rotation_x - angle_inc) % (2.0 * PI);
+                true
             }
             termion::event::Key::Char('y') => {
                 config.rotation_y = (config.rotation_y + angle_inc) % (2.0 * PI);
+                true
             }
             termion::event::Key::Char('Y') => {
                 config.rotation_y = (config.rotation_y - angle_inc) % (2.0 * PI);
+                true
             }
             termion::event::Key::Char('z') => {
                 config.rotation_z = (config.rotation_z + angle_inc) % (2.0 * PI);
+                true
             }
             termion::event::Key::Char('Z') => {
                 config.rotation_z = (config.rotation_z - angle_inc) % (2.0 * PI);
+                true
+            }
+            termion::event::Key::Char('s') => {
+                if let Err(err) = save_frame(&config, &current_frame) {
+                    reset_screen(&mut stdout)?;
+                    return Err(err);
+                }
+
+                false
             }
             _ => continue,
-        }
+        };
 
-        draw(&config, stl.clone())?;
+        if redraw {
+            current_frame = draw(&config, stl.clone())?;
+        }
     }
 
-    write!(
-        stdout,
-        "{}{}{}{}\r\n",
-        termion::color::Bg(termion::color::Reset),
-        termion::clear::All,
-        termion::cursor::Goto(1, 1),
-        termion::cursor::Show
-    )?;
+    reset_screen(&mut stdout)?;
 
     Ok(())
+}
+
+fn render_stl<W: Write>(
+    w: &mut W,
+    stl: &Stl,
+    clear: bool,
+    max_dimensions: Option<(i32, i32)>,
+    config: &App,
+) -> io::Result<Vec<String>> {
+    let mut canvas = Canvas::new();
+
+    if config.only_wireframe {
+        for f in &stl.facets {
+            canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+        }
+    } else {
+        for f in &stl.facets {
+            canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+        }
+    }
+
+    // callers can clear the screen by themselves, but it usually causes
+    // flickering on big terminals. Therefore defer clearing the screen until
+    // the very last.
+    if clear {
+        // changing the background color needs clearing before it can be
+        // rendered effectively
+        if !config.no_depth {
+            write!(
+                w,
+                "{}",
+                termion::color::Bg(termesh::drawille::Canvas::background_color())
+            )?;
+        }
+        clear_screen(w)?;
+    }
+
+    let frame = match max_dimensions {
+        None => {
+            let frame = canvas.rows(!config.no_depth).collect::<Vec<_>>();
+
+            for r in &frame {
+                write!(w, "{}\r\n", r)?;
+            }
+            w.flush()?;
+
+            frame
+        }
+        Some((max_width, max_height)) => {
+            if let Some((min_r, max_r, min_c, max_c)) = canvas.dimensions() {
+                let padded = |min, max, max_len| {
+                    if max_len <= max - min {
+                        min
+                    } else {
+                        let padding = max_len - (max - min);
+                        min - padding / 2
+                    }
+                };
+
+                let min_r = padded(min_r, max_r, max_height);
+                let min_c = padded(min_c, max_c, max_width);
+
+                let frame = canvas
+                    .frame(!config.no_depth, min_r, max_r, min_c, Some(max_c))
+                    .collect::<Vec<_>>();
+
+                for r in &frame {
+                    write!(w, "{}\r\n", r)?;
+                }
+                w.flush()?;
+
+                frame
+            } else {
+                vec![]
+            }
+        }
+    };
+
+    Ok(frame)
 }
 
 fn rotate_stl(stl: &mut Stl, rotation_x: f32, rotation_y: f32, rotation_z: f32) {
@@ -180,73 +267,6 @@ fn scale_stl(stl: &mut Stl, scale: f32) {
     }
 }
 
-fn render_stl<W: Write>(
-    w: &mut W,
-    stl: &Stl,
-    clear: bool,
-    max_dimensions: Option<(i32, i32)>,
-    config: &App,
-) -> io::Result<()> {
-    let mut canvas = Canvas::new();
-
-    if config.only_wireframe {
-        for f in &stl.facets {
-            canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
-        }
-    } else {
-        for f in &stl.facets {
-            canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
-        }
-    }
-
-    // callers can clear the screen by themselves, but it usually causes
-    // flickering on big terminals. Therefore defer clearing the screen until
-    // the very last.
-    if clear {
-        // changing the background color needs clearing before it can be
-        // rendered effectively
-        if !config.no_depth {
-            write!(
-                w,
-                "{}",
-                termion::color::Bg(termesh::drawille::Canvas::background_color())
-            )?;
-        }
-        clear_screen(w)?;
-    }
-
-    match max_dimensions {
-        None => {
-            for r in canvas.rows(!config.no_depth) {
-                write!(w, "{}\r\n", r)?;
-            }
-            w.flush()
-        }
-        Some((max_width, max_height)) => {
-            if let Some((min_r, max_r, min_c, max_c)) = canvas.dimensions() {
-                let padded = |min, max, max_len| {
-                    if max_len <= max - min {
-                        min
-                    } else {
-                        let padding = max_len - (max - min);
-                        min - padding / 2
-                    }
-                };
-
-                let min_r = padded(min_r, max_r, max_height);
-                let min_c = padded(min_c, max_c, max_width);
-
-                for r in canvas.frame(!config.no_depth, min_r, max_r, min_c, Some(max_c)) {
-                    write!(w, "{}\r\n", r)?;
-                }
-                w.flush()?;
-            }
-
-            Ok(())
-        }
-    }
-}
-
 fn determine_scale_factor(stl: &Stl, max_width: u16, max_height: u16) -> f32 {
     let mut vs = stl.vertices();
 
@@ -272,6 +292,27 @@ fn determine_scale_factor(stl: &Stl, max_width: u16, max_height: u16) -> f32 {
     scalex.min(scaley)
 }
 
+fn save_frame(config: &App, frame: &[String]) -> io::Result<()> {
+    let mut out = File::create(&format!(
+        "{}-{}.txt",
+        config
+            .mesh_filepath
+            .file_stem()
+            .unwrap_or(std::ffi::OsStr::new(""))
+            .to_string_lossy(),
+        time::SystemTime::now()
+            .duration_since(time::SystemTime::UNIX_EPOCH)
+            .expect("clock drift")
+            .as_secs()
+    ))?;
+
+    for row in frame {
+        write!(out, "{}\r\n", row)?;
+    }
+
+    Ok(())
+}
+
 fn clear_screen<W: Write>(w: &mut W) -> io::Result<()> {
     write!(
         w,
@@ -282,4 +323,15 @@ fn clear_screen<W: Write>(w: &mut W) -> io::Result<()> {
     w.flush()?;
 
     Ok(())
+}
+
+fn reset_screen<W: Write>(w: &mut W) -> io::Result<()> {
+    write!(
+        w,
+        "{}{}{}{}\r\n",
+        termion::color::Bg(termion::color::Reset),
+        termion::clear::All,
+        termion::cursor::Goto(1, 1),
+        termion::cursor::Show
+    )
 }
