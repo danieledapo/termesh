@@ -23,17 +23,32 @@ struct App {
 
     /// Rotate the input mesh around the x axis by a given angle in radians
     /// before displaying.
-    #[structopt(short = "x", long = "rotation-x", default_value = "0")]
+    #[structopt(
+        short = "x",
+        long = "rotation-x",
+        default_value = "0",
+        raw(allow_hyphen_values = "true")
+    )]
     rotation_x: f32,
 
     /// Rotate the input mesh around the y axis by a given angle in radians
     /// before displaying.
-    #[structopt(short = "y", long = "rotation-y", default_value = "0")]
+    #[structopt(
+        short = "y",
+        long = "rotation-y",
+        default_value = "0",
+        raw(allow_hyphen_values = "true")
+    )]
     rotation_y: f32,
 
     /// Rotate the input mesh around the z axis by a given angle in radians
     /// before displaying.
-    #[structopt(short = "z", long = "rotation-z", default_value = "0")]
+    #[structopt(
+        short = "z",
+        long = "rotation-z",
+        default_value = "0",
+        raw(allow_hyphen_values = "true")
+    )]
     rotation_z: f32,
 
     /// Do not render using true colors. This will effectively make the depth
