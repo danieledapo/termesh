@@ -45,6 +45,10 @@ struct App {
     #[structopt(short = "w", long = "wireframe")]
     only_wireframe: bool,
 
+    /// Display a mesh and exit.
+    #[structopt(long = "non-interactive")]
+    non_interactive: bool,
+
     /// Input mesh to display. Only binary STL as of now.
     #[structopt(parse(from_os_str))]
     mesh_filepath: PathBuf,
@@ -56,10 +60,10 @@ fn main() -> io::Result<()> {
     let mut f = File::open(&app.mesh_filepath)?;
     let stl = Stl::parse_binary(&mut f)?;
 
-    if termion::is_tty(&io::stdout()) {
-        interactive(app, stl)
-    } else {
+    if app.non_interactive || !termion::is_tty(&io::stdout()) {
         non_interactive(app, stl)
+    } else {
+        interactive(app, stl)
     }
 }
 
