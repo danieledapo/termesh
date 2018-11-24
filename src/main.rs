@@ -13,6 +13,7 @@ use termion::raw::IntoRawMode;
 
 use termesh::drawille::Canvas;
 use termesh::stl::Stl;
+use termesh::Vector3;
 
 /// Display 3D objects in the terminal using Braille characters.
 #[derive(Debug, StructOpt)]
@@ -69,6 +70,34 @@ struct App {
     mesh_filepath: PathBuf,
 }
 
+trait Scene: Clone {
+    fn vertices<'s>(&'s self) -> Box<dyn Iterator<Item = &Vector3> + 's>;
+    fn vertices_mut<'s>(&'s mut self) -> Box<dyn Iterator<Item = &mut Vector3> + 's>;
+    fn render(&self, canvas: &mut Canvas, only_wireframe: bool);
+}
+
+impl Scene for Stl {
+    fn vertices<'s>(&'s self) -> Box<dyn Iterator<Item = &Vector3> + 's> {
+        Box::new(self.vertices())
+    }
+
+    fn vertices_mut<'s>(&'s mut self) -> Box<dyn Iterator<Item = &mut Vector3> + 's> {
+        Box::new(self.vertices_mut())
+    }
+
+    fn render(&self, canvas: &mut Canvas, only_wireframe: bool) {
+        if only_wireframe {
+            for f in &self.facets {
+                canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+            }
+        } else {
+            for f in &self.facets {
+                canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
+            }
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
     let app = App::from_args();
 
@@ -82,50 +111,50 @@ fn main() -> io::Result<()> {
     }
 }
 
-fn non_interactive(config: App, mut stl: Stl) -> io::Result<()> {
+fn non_interactive<S: Scene>(config: App, mut scene: S) -> io::Result<()> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
 
-    rotate_stl(
-        &mut stl,
+    rotate_scene(
+        &mut scene,
         config.rotation_x,
         config.rotation_y,
         config.rotation_z,
     );
-    scale_stl(&mut stl, config.scale.unwrap_or(1.0));
+    scale_scene(&mut scene, config.scale.unwrap_or(1.0));
 
-    render_stl(&mut stdout, &stl, false, None, &config)?;
+    render_scene(&mut stdout, &scene, false, None, &config)?;
 
     Ok(())
 }
 
-fn interactive(mut config: App, stl: Stl) -> io::Result<()> {
+fn interactive<S: Scene>(mut config: App, scene: S) -> io::Result<()> {
     let mut stdout = io::stdout().into_raw_mode()?;
     write!(stdout, "{}\r\n", termion::cursor::Hide)?;
 
     let angle_inc = PI / 6.0;
 
-    let mut draw = |c: &App, mut stl| -> io::Result<Vec<String>> {
+    let mut draw = |c: &App, mut scene| -> io::Result<Vec<String>> {
         let terminal_size = termion::terminal_size()?;
 
-        rotate_stl(&mut stl, c.rotation_x, c.rotation_y, c.rotation_z);
+        rotate_scene(&mut scene, c.rotation_x, c.rotation_y, c.rotation_z);
 
         let padding = 5;
         let scale = c.scale.unwrap_or_else(|| {
-            determine_scale_factor(&stl, terminal_size.0 - padding, terminal_size.1 - padding)
+            determine_scale_factor(&scene, terminal_size.0 - padding, terminal_size.1 - padding)
         });
 
-        scale_stl(&mut stl, scale);
-        render_stl(
+        scale_scene(&mut scene, scale);
+        render_scene(
             &mut stdout,
-            &stl,
+            &scene,
             true,
             Some((i32::from(terminal_size.0), i32::from(terminal_size.1))),
             c,
         )
     };
 
-    let mut current_frame = draw(&config, stl.clone())?;
+    let mut current_frame = draw(&config, scene.clone())?;
 
     for ev in io::stdin().keys() {
         let ev = ev?;
@@ -168,7 +197,7 @@ fn interactive(mut config: App, stl: Stl) -> io::Result<()> {
         };
 
         if redraw {
-            current_frame = draw(&config, stl.clone())?;
+            current_frame = draw(&config, scene.clone())?;
         }
     }
 
@@ -177,24 +206,16 @@ fn interactive(mut config: App, stl: Stl) -> io::Result<()> {
     Ok(())
 }
 
-fn render_stl<W: Write>(
+fn render_scene<W: Write, S: Scene>(
     w: &mut W,
-    stl: &Stl,
+    scene: &S,
     clear: bool,
     max_dimensions: Option<(i32, i32)>,
     config: &App,
 ) -> io::Result<Vec<String>> {
     let mut canvas = Canvas::new();
 
-    if config.only_wireframe {
-        for f in &stl.facets {
-            canvas.triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
-        }
-    } else {
-        for f in &stl.facets {
-            canvas.fill_triangle(f.vertices[0], f.vertices[1], f.vertices[2]);
-        }
-    }
+    scene.render(&mut canvas, config.only_wireframe);
 
     // callers can clear the screen by themselves, but it usually causes
     // flickering on big terminals. Therefore defer clearing the screen until
@@ -256,12 +277,12 @@ fn render_stl<W: Write>(
     Ok(frame)
 }
 
-fn rotate_stl(stl: &mut Stl, rotation_x: f32, rotation_y: f32, rotation_z: f32) {
+fn rotate_scene<S: Scene>(scene: &mut S, rotation_x: f32, rotation_y: f32, rotation_z: f32) {
     if rotation_x == 0.0 && rotation_y == 0.0 && rotation_z == 0.0 {
         return;
     }
 
-    for v in stl.vertices_mut() {
+    for v in scene.vertices_mut() {
         if rotation_x != 0.0 {
             v.rotate_x(rotation_x);
         }
@@ -276,18 +297,18 @@ fn rotate_stl(stl: &mut Stl, rotation_x: f32, rotation_y: f32, rotation_z: f32) 
     }
 }
 
-fn scale_stl(stl: &mut Stl, scale: f32) {
+fn scale_scene<S: Scene>(scene: &mut S, scale: f32) {
     if scale == 1.0 {
         return;
     }
 
-    for v in stl.vertices_mut() {
+    for v in scene.vertices_mut() {
         *v *= scale;
     }
 }
 
-fn determine_scale_factor(stl: &Stl, max_width: u16, max_height: u16) -> f32 {
-    let mut vs = stl.vertices();
+fn determine_scale_factor<S: Scene>(scene: &S, max_width: u16, max_height: u16) -> f32 {
+    let mut vs = scene.vertices();
 
     let (w, h) = vs
         .next()
