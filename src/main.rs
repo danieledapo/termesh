@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 use std::fs::File;
 use std::io;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time;
 
@@ -12,6 +12,7 @@ use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
 use termesh::drawille::Canvas;
+use termesh::dsl;
 use termesh::stl::Stl;
 use termesh::Vector3;
 
@@ -65,7 +66,9 @@ struct App {
     #[structopt(long = "non-interactive")]
     non_interactive: bool,
 
-    /// Input mesh to display. Only binary STL as of now.
+    /// Input mesh to display. If the extension is `tmesh` then it's assumed
+    /// that the mesh is written using the Termesh DSL otherwise it's assumed
+    /// it's a binary STL.
     #[structopt(parse(from_os_str))]
     mesh_filepath: PathBuf,
 }
@@ -98,10 +101,62 @@ impl Scene for Stl {
     }
 }
 
+impl<'input> Scene for dsl::ast::Module<'input> {
+    fn vertices<'s>(&'s self) -> Box<dyn Iterator<Item = &Vector3> + 's> {
+        Box::new(self.vertices())
+    }
+
+    fn vertices_mut<'s>(&'s mut self) -> Box<dyn Iterator<Item = &mut Vector3> + 's> {
+        Box::new(self.vertices_mut())
+    }
+
+    fn render(&self, canvas: &mut Canvas, only_wireframe: bool) {
+        let mut env = std::collections::HashMap::new();
+
+        for stmt in &self.statements {
+            match stmt.expr {
+                termesh::dsl::ast::Expr::Vertex(name, pos) => {
+                    env.insert(name, pos);
+                }
+                termesh::dsl::ast::Expr::Line(v0, v1) => {
+                    canvas.line(env[v0], env[v1]);
+                }
+                termesh::dsl::ast::Expr::Triangle(v0, v1, v2) => {
+                    if only_wireframe {
+                        canvas.triangle(env[v0], env[v1], env[v2]);
+                    } else {
+                        canvas.fill_triangle(env[v0], env[v1], env[v2]);
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
     let app = App::from_args();
 
     let mut f = File::open(&app.mesh_filepath)?;
+
+    if let Some(ext) = app.mesh_filepath.extension() {
+        if ext == std::ffi::OsStr::new("tmesh") {
+            let mut buf = String::new();
+            f.read_to_string(&mut buf)?;
+
+            // TODO: error handling
+            let prog = dsl::parse_module(&buf).unwrap();
+            dsl::type_check(&prog).expect("program didn't typecheck");
+
+            if app.non_interactive || !termion::is_tty(&io::stdout()) {
+                non_interactive(app, prog)?;
+            } else {
+                interactive(app, prog)?;
+            }
+
+            return Ok(());
+        }
+    }
+
     let stl = Stl::parse_binary(&mut f)?;
 
     if app.non_interactive || !termion::is_tty(&io::stdout()) {
