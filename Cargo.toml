@@ -5,10 +5,10 @@ authors = ["Daniele D'Orazio <d.dorazio96@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-num-traits = "0.2.6"
 byteorder = "1.2.7"
-termion = "1.5.1"
+num-traits = "0.2.6"
 structopt = "0.2.13"
+termion = "1.5.1"
 
 [dev-dependencies]
 maplit = "1.0.1"

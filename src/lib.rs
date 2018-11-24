@@ -2,4 +2,4 @@ pub mod drawille;
 pub mod stl;
 pub mod vector3;
 
-mod utils;
+pub use self::vector3::Vector3;

@@ -14,8 +14,10 @@ pub mod line;
 
 use std::collections::BTreeMap;
 
-use crate::utils::btree_minmax;
-use crate::vector3::Vector3;
+mod utils;
+use self::utils::btree_minmax;
+
+use crate::Vector3;
 
 static BRAILLE_PATTERN_BLANK: char = '\u{2800}';
 static BRAILLE_OFFSET_MAP: [[u8; 2]; 4] = [
@@ -281,8 +283,7 @@ impl<'a> Iterator for Rows<'a> {
                     .map(|x| {
                         row.get(&x)
                             .map_or(BRAILLE_PATTERN_BLANK.to_string(), |pix| self.braille(pix))
-                    })
-                    .collect(),
+                    }).collect(),
             },
         };
 
