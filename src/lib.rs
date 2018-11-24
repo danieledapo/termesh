@@ -1,4 +1,5 @@
 pub mod drawille;
+pub mod dsl;
 pub mod stl;
 pub mod vector3;
 
