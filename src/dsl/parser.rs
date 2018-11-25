@@ -72,14 +72,19 @@ where
             stmt_start => self.unexpected(stmt_start, section),
         };
 
-        if let Some(s) = self.line.by_ref().next() {
-            Some(self.unexpected(s, "<eol>"))
-        } else {
-            Some(res.map(|expr| Statement {
-                expr,
-                line: self.raw_line,
-                line_no: self.line_no,
-            }))
+        match res {
+            Ok(expr) => {
+                if let Some(s) = self.line.by_ref().next() {
+                    Some(self.unexpected(s, "<eol>"))
+                } else {
+                    Some(Ok(Statement {
+                        expr,
+                        line: self.raw_line,
+                        line_no: self.line_no,
+                    }))
+                }
+            }
+            Err(err) => Some(Err(err)),
         }
     }
 
