@@ -1,5 +1,12 @@
 use crate::Vector3;
 
+#[derive(Debug, PartialEq)]
+pub struct Error<'input, T> {
+    pub line: &'input str,
+    pub line_no: usize,
+    pub kind: T,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Module<'input> {
     pub input: &'input str,
@@ -9,6 +16,7 @@ pub struct Module<'input> {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Statement<'input> {
     pub line: &'input str,
+    pub line_no: usize,
     pub expr: Expr<'input>,
 }
 

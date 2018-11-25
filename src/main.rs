@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::process::exit;
 use std::time;
 
 use structopt::StructOpt;
@@ -143,14 +144,25 @@ fn main() -> io::Result<()> {
             let mut buf = String::new();
             f.read_to_string(&mut buf)?;
 
-            // TODO: error handling
-            let prog = dsl::parse_module(&buf).unwrap();
-            dsl::type_check(&prog).expect("program didn't typecheck");
+            match dsl::parse_module(&buf) {
+                Ok(prog) => {
+                    if let Err(typecheck_err) = dsl::type_check(&prog) {
+                        eprintln!();
+                        print_dsl_error(typecheck_err, &app.mesh_filepath);
+                        exit(1);
+                    }
 
-            if app.non_interactive || !termion::is_tty(&io::stdout()) {
-                non_interactive(app, prog)?;
-            } else {
-                interactive(app, prog)?;
+                    if app.non_interactive || !termion::is_tty(&io::stdout()) {
+                        non_interactive(app, prog)?;
+                    } else {
+                        interactive(app, prog)?;
+                    }
+                }
+                Err(parse_error) => {
+                    eprintln!();
+                    print_dsl_error(parse_error, &app.mesh_filepath);
+                    exit(1);
+                }
             }
 
             return Ok(());
@@ -406,6 +418,40 @@ fn save_frame(config: &App, frame: &[String]) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn print_dsl_error<T: std::fmt::Display>(err: dsl::ast::Error<T>, filepath: &PathBuf) {
+    use termion::color::{Fg, LightCyan, LightRed, Reset};
+
+    let line_no = (err.line_no + 1).to_string();
+    let left_padding = line_no.chars().count() + 1;
+
+    eprintln!("{}error{}: {}", Fg(LightRed), Fg(Reset), err.kind);
+    eprintln!(
+        "{fill:pad$}{}-->{} {}:{}",
+        Fg(LightCyan),
+        Fg(Reset),
+        filepath.to_string_lossy(),
+        err.line_no + 1,
+        fill = " ",
+        pad = left_padding - 1
+    );
+    eprintln!(
+        "{fill:pad$}{}|{}",
+        Fg(LightCyan),
+        Fg(Reset),
+        fill = " ",
+        pad = left_padding
+    );
+    eprintln!("{} {}|{} {}", line_no, Fg(LightCyan), Fg(Reset), err.line,);
+    eprintln!(
+        "{fill:pad$}{}|{}",
+        Fg(LightCyan),
+        Fg(Reset),
+        fill = " ",
+        pad = left_padding
+    );
+    eprintln!();
 }
 
 fn clear_screen<W: Write>(w: &mut W) -> io::Result<()> {

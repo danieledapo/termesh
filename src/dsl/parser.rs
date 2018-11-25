@@ -2,15 +2,12 @@ use std::str::FromStr;
 
 use crate::Vector3;
 
+use crate::dsl::ast;
 use crate::dsl::ast::{Expr, Module, Statement};
 
 pub type Result<'input, T> = std::result::Result<T, ParseError<'input>>;
 
-#[derive(Debug, PartialEq)]
-pub struct ParseError<'input> {
-    pub line: &'input str,
-    pub kind: ParseErrorKind<'input>,
-}
+pub type ParseError<'input> = ast::Error<'input, ParseErrorKind<'input>>;
 
 #[derive(Debug, PartialEq)]
 pub enum ParseErrorKind<'input> {
@@ -23,8 +20,10 @@ pub enum ParseErrorKind<'input> {
 pub fn parse_module(input: &str) -> Result<Module> {
     let stmts = input
         .lines()
-        .flat_map(|l| {
+        .enumerate()
+        .flat_map(|(i, l)| {
             LineParser {
+                line_no: i,
                 raw_line: l,
                 line: l.split_whitespace(),
             }
@@ -41,6 +40,7 @@ pub fn parse_module(input: &str) -> Result<Module> {
 #[derive(Debug)]
 struct LineParser<'input, I> {
     raw_line: &'input str,
+    line_no: usize,
     line: I,
 }
 
@@ -73,6 +73,7 @@ where
             Some(res.map(|expr| Statement {
                 expr,
                 line: self.raw_line,
+                line_no: self.line_no,
             }))
         }
     }
@@ -143,7 +144,23 @@ where
     fn error<T>(&self, kind: ParseErrorKind<'input>) -> Result<'input, T> {
         Err(ParseError {
             line: self.raw_line,
+            line_no: self.line_no,
             kind,
         })
+    }
+}
+
+impl<'input> std::fmt::Display for ParseErrorKind<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ParseErrorKind::UnexpectedEol(expected) => {
+                write!(f, "expected {}, found end of line", expected)
+            }
+            ParseErrorKind::Unexpected(got, expected) => {
+                write!(f, "expected {}, found `{}`", expected, got)
+            }
+            ParseErrorKind::BadIdentifier(got) => write!(f, "`{}` is not a valid identifier", got),
+            ParseErrorKind::BadNumber(got) => write!(f, "`{}` is not a valid number", got),
+        }
     }
 }
