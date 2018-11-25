@@ -60,6 +60,11 @@ where
 
         let ty = self.next(section).ok()?;
 
+        // comments should probably added to the ast
+        if ty.starts_with("#") {
+            return None;
+        }
+
         let res = match ty {
             "vertex" => self.parse_vertex(),
             "line" => self.parse_line(),

@@ -22,6 +22,8 @@ mod tests {
 
         line v1 v2
         triangle v2 v3 v4
+
+        # comment
         ";
 
         let tree = parse_module(module).unwrap();
