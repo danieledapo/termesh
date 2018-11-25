@@ -252,6 +252,14 @@ fn interactive<S: Scene>(mut config: App, scene: S) -> io::Result<()> {
                 config.rotation_z = (config.rotation_z - angle_inc) % (2.0 * PI);
                 true
             }
+            termion::event::Key::Char('w') => {
+                config.only_wireframe = !config.only_wireframe;
+                true
+            }
+            termion::event::Key::Char('d') => {
+                config.no_depth = !config.no_depth;
+                true
+            }
             termion::event::Key::Char('s') => {
                 if let Err(err) = save_frame(&config, &current_frame) {
                     reset_screen(&mut stdout)?;
@@ -295,6 +303,13 @@ fn render_scene<W: Write, S: Scene>(
                 w,
                 "{}",
                 termion::color::Bg(termesh::drawille::Canvas::background_color())
+            )?;
+        } else {
+            write!(
+                w,
+                "{}{}",
+                termion::color::Bg(termion::color::Reset),
+                termion::color::Fg(termion::color::Reset)
             )?;
         }
         clear_screen(w)?;

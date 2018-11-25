@@ -38,6 +38,8 @@ triangle v1 v2 v3
 <pre>
 <kbd>q</kbd>: Quit
 <kbd>s</kbd>: Save current frame to file
+<kbd>d</kbd>: Toggle depth rendering
+<kbd>w</kbd>: Toggle rendering only wireframe
 <kbd>x</kbd>: Rotate on the X axis counterclockwise
 <kbd>X</kbd>: Rotate on the X axis clockwise
 <kbd>y</kbd>: Rotate on the Y axis counterclockwise
