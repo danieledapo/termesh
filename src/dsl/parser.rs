@@ -169,3 +169,128 @@ impl<'input> std::fmt::Display for ParseErrorKind<'input> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ParseErrorKind::*;
+    use super::*;
+
+    use crate::dsl::ast::Expr::Vertex;
+
+    #[test]
+    fn test_vertex_numbers() {
+        assert_eq!(
+            parse_module("vertex v1 = 1 -1.42 0.5E-12"),
+            Ok(Module {
+                input: "vertex v1 = 1 -1.42 0.5E-12",
+                statements: vec![Statement {
+                    line: "vertex v1 = 1 -1.42 0.5E-12",
+                    line_no: 0,
+                    expr: Vertex("v1", Vector3::new(1.0, -1.42, 0.5E-12))
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn test_unexpected_eol() {
+        assert_eq!(
+            parse_module("vertex"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "vertex",
+                kind: UnexpectedEol("identifier"),
+            })
+        );
+
+        assert_eq!(
+            parse_module("vertex v1 ="),
+            Err(ast::Error {
+                line_no: 0,
+                line: "vertex v1 =",
+                kind: UnexpectedEol("number"),
+            })
+        );
+
+        assert_eq!(
+            parse_module("line v1"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "line v1",
+                kind: UnexpectedEol("identifier"),
+            })
+        );
+    }
+
+    #[test]
+    fn test_unexpected() {
+        assert_eq!(
+            parse_module("vertex v1 42"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "vertex v1 42",
+                kind: Unexpected("42", "="),
+            })
+        );
+
+        assert_eq!(
+            parse_module("line v1 v2 v3"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "line v1 v2 v3",
+                kind: Unexpected("v3", "<eol>"),
+            })
+        );
+    }
+
+    #[test]
+    fn test_bad_number() {
+        assert_eq!(
+            parse_module("vertex v = 42a 0 0"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "vertex v = 42a 0 0",
+                kind: BadNumber("42a"),
+            })
+        );
+
+        assert_eq!(
+            parse_module("vertex v = 0.98a 6 0"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "vertex v = 0.98a 6 0",
+                kind: BadNumber("0.98a"),
+            })
+        );
+    }
+
+    #[test]
+    fn test_bad_identifier() {
+        assert_eq!(
+            parse_module("vertex 42s"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "vertex 42s",
+                kind: BadIdentifier("42s"),
+            })
+        );
+
+        assert_eq!(
+            parse_module("line 42 v1"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "line 42 v1",
+                kind: BadIdentifier("42"),
+            })
+        );
+
+        assert_eq!(
+            parse_module("triangle v0 v1 1234"),
+            Err(ast::Error {
+                line_no: 0,
+                line: "triangle v0 v1 1234",
+                kind: BadIdentifier("1234"),
+            })
+        );
+    }
+}

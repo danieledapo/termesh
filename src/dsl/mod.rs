@@ -13,7 +13,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_simple() {
+    fn test_simple_program() {
         let module = r"
         vertex v1 = 3 2 1
         vertex v2 = 1 2 3
