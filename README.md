@@ -32,3 +32,16 @@ line v1 v2
 # draw triangles
 triangle v1 v2 v3
 ```
+
+## Keybindings
+
+<pre>
+<kbd>q</kbd>: Quit
+<kbd>s</kbd>: Save current frame to file
+<kbd>x</kbd>: Rotate on the X axis counterclockwise
+<kbd>X</kbd>: Rotate on the X axis clockwise
+<kbd>y</kbd>: Rotate on the Y axis counterclockwise
+<kbd>Y</kbd>: Rotate on the Y axis clockwise
+<kbd>z</kbd>: Rotate on the Z axis counterclockwise
+<kbd>Z</kbd>: Rotate on the Z axis clockwise
+</pre>
