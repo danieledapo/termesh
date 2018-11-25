@@ -1,0 +1,17 @@
+# define vertices
+vertex tip  = 1 1 2
+vertex b1   = 0 0 0
+vertex b2   = 0 2 0
+vertex b3   = 2 2 0
+vertex b4   = 2 0 0
+
+# build triangles
+triangle tip b1 b2
+triangle tip b2 b3
+triangle tip b3 b4
+triangle tip b4 b1
+
+# build lines
+vertex v0 = -0.5 -0.5 0
+vertex v1 =  2.5  2.5 2
+line v0 v1
