@@ -446,7 +446,7 @@ fn print_dsl_error<T: std::fmt::Display>(err: dsl::ast::Error<T>, filepath: &Pat
         "{fill:pad$}{}-->{} {}:{}",
         Fg(LightCyan),
         Fg(Reset),
-        filepath.to_string_lossy(),
+        filepath.display(),
         err.line_no + 1,
         fill = " ",
         pad = left_padding - 1
