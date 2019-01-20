@@ -1,6 +1,6 @@
 # Termesh
 
-Explore 3D meshes in your terminal!
+Explore 3D meshes in your terminal! If you want to know more take a look at [this blog post](https://d-dorazio.github.io/post/terminal-graphics-braille/).
 
 ![teapot1](images/teapot1.png)![teapot2](images/teapot2.png)![teapot3](images/teapot3.png)
 
