@@ -30,7 +30,7 @@ struct App {
         short = "x",
         long = "rotation-x",
         default_value = "0",
-        raw(allow_hyphen_values = "true")
+        allow_hyphen_values = true
     )]
     rotation_x: f32,
 
@@ -40,7 +40,7 @@ struct App {
         short = "y",
         long = "rotation-y",
         default_value = "0",
-        raw(allow_hyphen_values = "true")
+        allow_hyphen_values = true
     )]
     rotation_y: f32,
 
@@ -50,7 +50,7 @@ struct App {
         short = "z",
         long = "rotation-z",
         default_value = "0",
-        raw(allow_hyphen_values = "true")
+        allow_hyphen_values = true
     )]
     rotation_z: f32,
 
