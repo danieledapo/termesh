@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time;
 
-use structopt::StructOpt;
+use clap::Parser;
 
 use termion;
 use termion::input::TermRead;
@@ -18,16 +18,16 @@ use termesh::stl::Stl;
 use termesh::Vector3;
 
 /// Display 3D objects in the terminal using Braille characters.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct App {
     /// Scale the input mesh by a given factor. If passed disables autoscaling.
-    #[structopt(short = "s", long = "scale")]
+    #[clap(short = 's', long = "scale")]
     scale: Option<f32>,
 
     /// Rotate the input mesh around the x axis by a given angle in radians
     /// before displaying.
-    #[structopt(
-        short = "x",
+    #[clap(
+        short = 'x',
         long = "rotation-x",
         default_value = "0",
         allow_hyphen_values = true
@@ -36,8 +36,8 @@ struct App {
 
     /// Rotate the input mesh around the y axis by a given angle in radians
     /// before displaying.
-    #[structopt(
-        short = "y",
+    #[clap(
+        short = 'y',
         long = "rotation-y",
         default_value = "0",
         allow_hyphen_values = true
@@ -46,8 +46,8 @@ struct App {
 
     /// Rotate the input mesh around the z axis by a given angle in radians
     /// before displaying.
-    #[structopt(
-        short = "z",
+    #[clap(
+        short = 'z',
         long = "rotation-z",
         default_value = "0",
         allow_hyphen_values = true
@@ -56,21 +56,21 @@ struct App {
 
     /// Do not render using true colors. This will effectively make the depth
     /// all the same.
-    #[structopt(long = "no-depth")]
+    #[clap(long = "no-depth")]
     no_depth: bool,
 
     /// Display only the wireframe of the mesh.
-    #[structopt(short = "w", long = "wireframe")]
+    #[clap(short = 'w', long = "wireframe")]
     only_wireframe: bool,
 
     /// Display a mesh and exit.
-    #[structopt(long = "non-interactive")]
+    #[clap(long = "non-interactive")]
     non_interactive: bool,
 
     /// Input mesh to display. If the extension is `tmesh` then it's assumed
     /// that the mesh is written using the Termesh DSL otherwise it's assumed
     /// it's a binary STL.
-    #[structopt(parse(from_os_str))]
+    #[clap(parse(from_os_str))]
     mesh_filepath: PathBuf,
 }
 

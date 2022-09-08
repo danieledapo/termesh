@@ -6,8 +6,8 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1.4"
+clap = {version = "3.2", features = ["derive"]}
 num-traits = "0.2"
-structopt = "0.3"
 termion = "1.5"
 
 [dev-dependencies]
