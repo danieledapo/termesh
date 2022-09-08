@@ -6,7 +6,7 @@ pub type Result<'input, T> = std::result::Result<T, TypeCheckError<'input>>;
 
 pub type TypeCheckError<'input> = ast::Error<'input, TypeCheckErrorKind<'input>>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TypeCheckErrorKind<'input> {
     UndeclaredVariable(&'input str),
 }

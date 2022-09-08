@@ -1,6 +1,6 @@
 use crate::Vector3;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Error<'input, T> {
     pub line: &'input str,
     pub line_no: usize,

@@ -2,13 +2,12 @@ use std::f32::consts::PI;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::time;
 
 use clap::Parser;
 
-use termion;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 
@@ -420,7 +419,7 @@ fn save_frame(config: &App, frame: &[String]) -> io::Result<()> {
         config
             .mesh_filepath
             .file_stem()
-            .unwrap_or(std::ffi::OsStr::new(""))
+            .unwrap_or_else(|| std::ffi::OsStr::new(""))
             .to_string_lossy(),
         time::SystemTime::now()
             .duration_since(time::SystemTime::UNIX_EPOCH)
@@ -435,7 +434,7 @@ fn save_frame(config: &App, frame: &[String]) -> io::Result<()> {
     Ok(())
 }
 
-fn print_dsl_error<T: std::fmt::Display>(err: dsl::ast::Error<T>, filepath: &PathBuf) {
+fn print_dsl_error<T: std::fmt::Display>(err: dsl::ast::Error<T>, filepath: &Path) {
     use termion::color::{Fg, LightCyan, LightRed, Reset};
 
     let line_no = (err.line_no + 1).to_string();

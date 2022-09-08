@@ -9,7 +9,7 @@ pub type Result<'input, T> = std::result::Result<T, ParseError<'input>>;
 
 pub type ParseError<'input> = ast::Error<'input, ParseErrorKind<'input>>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseErrorKind<'input> {
     Unexpected(&'input str, &'input str),
     UnexpectedEol(&'input str),
@@ -61,7 +61,7 @@ where
         let ty = self.next(section).ok()?;
 
         // comments should probably added to the ast
-        if ty.starts_with("#") {
+        if ty.starts_with('#') {
             return None;
         }
 
