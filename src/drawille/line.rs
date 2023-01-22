@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use crate::Vector3;
 
 #[derive(Debug)]
@@ -24,7 +26,7 @@ impl Line {
             Self {
                 p0,
                 step: dir / steps,
-                steps: num_traits::cast(steps.round().abs() + 1.0).unwrap(),
+                steps: (steps.round().abs() + 1.0) as u64,
             }
         }
     }
@@ -34,7 +36,7 @@ impl Iterator for Line {
     type Item = Vector3;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, num_traits::cast(self.steps))
+        (0, usize::try_from(self.steps).ok())
     }
 
     fn next(&mut self) -> Option<Self::Item> {

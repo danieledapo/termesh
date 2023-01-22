@@ -250,7 +250,7 @@ impl<'a> Rows<'a> {
         // too bright which makes the eyes think the pixel is closer even though
         // it's not.
         let gray = if zmax - zmin != 0.0 {
-            23 - num_traits::cast::<_, u8>(((pix.z - zmin) / (zmax - zmin) * 19.0).round()).unwrap()
+            23 - (((pix.z - zmin) / (zmax - zmin) * 19.0).round()) as u8
         } else {
             // if there's only a z value then it's always at the top
             23
@@ -283,7 +283,8 @@ impl<'a> Iterator for Rows<'a> {
                     .map(|x| {
                         row.get(&x)
                             .map_or(BRAILLE_PATTERN_BLANK.to_string(), |pix| self.braille(pix))
-                    }).collect(),
+                    })
+                    .collect(),
             },
         };
 
@@ -313,7 +314,7 @@ mod tests {
 
         assert_eq!(
             c.rows,
-            btreemap!{
+            btreemap! {
                 0 => btreemap!{0 => Pixel {braille_offset: 1, z: 0.0}}
             }
         );
@@ -326,7 +327,7 @@ mod tests {
         c.set(Vector3::new(1.0, 1.0, 0.0));
         c.clear();
 
-        assert_eq!(c.rows, btreemap!{});
+        assert_eq!(c.rows, btreemap! {});
     }
 
     #[test]

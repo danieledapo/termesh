@@ -1,8 +1,10 @@
 //! Simple module to parse stl files.
 
-use std::fmt;
-use std::io;
-use std::io::Read;
+use std::{
+    convert::TryFrom,
+    fmt,
+    io::{self, Read},
+};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -27,7 +29,7 @@ impl Stl {
         r.read_exact(&mut header)?;
         let ntriangles = r.read_u32::<LittleEndian>()?;
 
-        let mut facets = Vec::with_capacity(num_traits::cast(ntriangles).unwrap_or(0));
+        let mut facets = Vec::with_capacity(usize::try_from(ntriangles).unwrap_or(0));
 
         let parse_v3 = |r: &mut R| -> io::Result<Vector3> {
             let x = r.read_f32::<LittleEndian>()?;

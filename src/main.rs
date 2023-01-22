@@ -1,31 +1,28 @@
-use std::f32::consts::PI;
-use std::fs::File;
-use std::io;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::time;
+use std::{
+    f32::consts::PI,
+    fs::File,
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+    process::exit,
+    time,
+};
 
 use clap::Parser;
 
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
+use termion::{input::TermRead, raw::IntoRawMode};
 
-use termesh::drawille::Canvas;
-use termesh::dsl;
-use termesh::stl::Stl;
-use termesh::Vector3;
+use termesh::{drawille::Canvas, dsl, stl::Stl, Vector3};
 
 /// Display 3D objects in the terminal using Braille characters.
 #[derive(Debug, Parser)]
 struct App {
     /// Scale the input mesh by a given factor. If passed disables autoscaling.
-    #[clap(short = 's', long = "scale")]
+    #[arg(short = 's', long = "scale")]
     scale: Option<f32>,
 
     /// Rotate the input mesh around the x axis by a given angle in radians
     /// before displaying.
-    #[clap(
+    #[arg(
         short = 'x',
         long = "rotation-x",
         default_value = "0",
@@ -35,7 +32,7 @@ struct App {
 
     /// Rotate the input mesh around the y axis by a given angle in radians
     /// before displaying.
-    #[clap(
+    #[arg(
         short = 'y',
         long = "rotation-y",
         default_value = "0",
@@ -45,7 +42,7 @@ struct App {
 
     /// Rotate the input mesh around the z axis by a given angle in radians
     /// before displaying.
-    #[clap(
+    #[arg(
         short = 'z',
         long = "rotation-z",
         default_value = "0",
@@ -55,21 +52,20 @@ struct App {
 
     /// Do not render using true colors. This will effectively make the depth
     /// all the same.
-    #[clap(long = "no-depth")]
+    #[arg(long = "no-depth")]
     no_depth: bool,
 
     /// Display only the wireframe of the mesh.
-    #[clap(short = 'w', long = "wireframe")]
+    #[arg(short = 'w', long = "wireframe")]
     only_wireframe: bool,
 
     /// Display a mesh and exit.
-    #[clap(long = "non-interactive")]
+    #[arg(long = "non-interactive")]
     non_interactive: bool,
 
     /// Input mesh to display. If the extension is `tmesh` then it's assumed
     /// that the mesh is written using the Termesh DSL otherwise it's assumed
     /// it's a binary STL.
-    #[clap(parse(from_os_str))]
     mesh_filepath: PathBuf,
 }
 
@@ -134,7 +130,7 @@ impl<'input> Scene for dsl::ast::Module<'input> {
 }
 
 fn main() -> io::Result<()> {
-    let app = App::from_args();
+    let app = App::parse();
 
     let mut f = File::open(&app.mesh_filepath)?;
 
@@ -414,7 +410,7 @@ fn determine_scale_factor<S: Scene>(scene: &S, max_width: u16, max_height: u16) 
 }
 
 fn save_frame(config: &App, frame: &[String]) -> io::Result<()> {
-    let mut out = File::create(&format!(
+    let mut out = File::create(format!(
         "{}-{}.txt",
         config
             .mesh_filepath
