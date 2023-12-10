@@ -5,8 +5,8 @@ authors = ["Daniele D'Orazio <d.dorazio96@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-byteorder = "1.4"
-clap = {version = "4.0", features = ["derive"]}
+byteorder = "1.5"
+clap = {version = "4.4", features = ["derive"]}
 termion = "2.0"
 
 [dev-dependencies]
